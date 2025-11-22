@@ -46,20 +46,23 @@ const double _lineWidthMeters = 0.05;
 const double _postWidthMeters = 0.12;
 const double _marginFactor = 0.04;
 const double _minMarginPx = 24.0;
+const double _heightScale = 0.35;
 const double _viewHeightMeters = 6.0;
 
 /// Renders a beach volleyball court with official FIVB measurements
-/// from a perspective camera view.
+/// with a blend between top-down and perspective projections.
 class BeachCourtPainter {
   BeachCourtPainter()
-    : projector = PerspectiveProjector(
-        camera: const Vec3(0, -2, 3),
-        target: const Vec3(0, 6, 0),
-        upHint: const Vec3(0, 0, 1),
-        focalLength: 1.1,
-      );
+      : projector = PerspectiveProjector(
+          camera: const Vec3(0, -14, 5),
+          target: const Vec3(0, 6, 0),
+          upHint: const Vec3(0, 0, 1),
+          focalLength: 1.1,
+        ),
+      viewBlend = 0.0;
 
   final PerspectiveProjector projector;
+  double viewBlend;
 
   void render(Canvas canvas, Rect viewport) {
     if (viewport.isEmpty) {
@@ -75,22 +78,23 @@ class BeachCourtPainter {
 
     const halfSandWidth = BeachCourtMeasurements.totalSandWidth / 2;
     const halfSandLength = BeachCourtMeasurements.totalSandLength / 2;
+
     final sandCorners = const [
       Vec3(-halfSandWidth, -halfSandLength, 0),
       Vec3(halfSandWidth, -halfSandLength, 0),
       Vec3(halfSandWidth, halfSandLength, 0),
       Vec3(-halfSandWidth, halfSandLength, 0),
     ];
-
     final projectedCorners = sandCorners.map(projector.project).toList();
     final minX = projectedCorners.map((p) => p.dx).reduce(math.min);
     final maxX = projectedCorners.map((p) => p.dx).reduce(math.max);
     final minY = projectedCorners.map((p) => p.dy).reduce(math.min);
+    final maxY = projectedCorners.map((p) => p.dy).reduce(math.max);
     final viewHeightPoint = projector.project(
       const Vec3(0, 0, _viewHeightMeters),
     );
-    final verticalRange = math.max(viewHeightPoint.dy - minY, 0.1);
-
+    final topY = math.max(viewHeightPoint.dy, maxY);
+    final verticalRange = math.max(topY - minY, 0.1);
     final horizontalRange = math.max(maxX - minX, 0.1);
 
     final availableWidth = math.max(size.width - marginPx * 2, 1.0);
@@ -102,12 +106,52 @@ class BeachCourtPainter {
     final postWidth = math.max(2.0, _postWidthMeters * scale);
     final meshWidth = math.max(0.8, lineWidth * 0.6);
 
-    Offset mapPoint(Vec3 worldPoint) {
-      final projected = projector.project(worldPoint);
+    final scaleTopDown = math.min(
+      availableWidth / BeachCourtMeasurements.totalSandWidth,
+      availableHeight / BeachCourtMeasurements.totalSandLength,
+    );
+    final contentWidth = BeachCourtMeasurements.totalSandWidth * scaleTopDown;
+    final contentHeight = BeachCourtMeasurements.totalSandLength * scaleTopDown;
+    final translateX =
+        marginPx + (size.width - marginPx * 2 - contentWidth) / 2;
+    final translateY =
+        marginPx + (size.height - marginPx * 2 - contentHeight) / 2;
+
+    Offset mapTopDown(Vec3 worldPoint) {
+      final x = worldPoint.x + halfSandWidth;
+      final y =
+          BeachCourtMeasurements.totalSandLength -
+          (worldPoint.y + halfSandLength);
+      final heightOffset = worldPoint.z * scaleTopDown * _heightScale;
       return Offset(
-        marginPx + (projected.dx - minX) * scale,
-        size.height - marginPx - (projected.dy - minY) * scale,
+        translateX + x * scaleTopDown,
+        translateY + y * scaleTopDown - heightOffset,
       );
+    }
+
+    Offset mapPerspective(Vec3 worldPoint) {
+      final projected = projector.project(worldPoint);
+      final xOffset = marginPx + (availableWidth - horizontalRange * scale) / 2;
+      final yOffset = marginPx + (availableHeight - verticalRange * scale) / 2;
+      return Offset(
+        xOffset + (projected.dx - minX) * scale,
+        yOffset + (topY - projected.dy) * scale,
+      );
+    }
+
+    Offset mapPoint(Vec3 worldPoint) {
+      if (viewBlend <= 0) {
+        return mapTopDown(worldPoint);
+      }
+      if (viewBlend >= 1) {
+        return mapPerspective(worldPoint);
+      }
+      return Offset.lerp(
+            mapTopDown(worldPoint),
+            mapPerspective(worldPoint),
+            viewBlend,
+          ) ??
+          mapPerspective(worldPoint);
     }
 
     Path buildPath(List<Vec3> points) {
