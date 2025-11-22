@@ -54,13 +54,13 @@ const double _viewHeightMeters = 6.0;
 class BeachCourtPainter {
   BeachCourtPainter()
     : projector = PerspectiveProjector(
-        camera: const Vec3(0, -14, 5),
-        target: const Vec3(0, 6, 0),
+        camera: const Vec3(0, -20, 15),
+        target: const Vec3(0, -10, 0),
         upHint: const Vec3(0, 0, 1),
-        focalLength: 1.1,
+        focalLength: 1.8,
       ),
       viewBlend = 0.0,
-      zoom = 1.0;
+      zoom = 2.0;
 
   final PerspectiveProjector projector;
   double viewBlend;
@@ -81,6 +81,23 @@ class BeachCourtPainter {
     const halfSandWidth = BeachCourtMeasurements.totalSandWidth / 2;
     const halfSandLength = BeachCourtMeasurements.totalSandLength / 2;
 
+    const courtHalfWidth = BeachCourtMeasurements.courtWidth / 2;
+    const courtHalfLength = BeachCourtMeasurements.courtLength / 2;
+
+    // Project court corners to get bounds for better framing
+    final courtCorners = const [
+      Vec3(-courtHalfWidth, -courtHalfLength, 0),
+      Vec3(courtHalfWidth, -courtHalfLength, 0),
+      Vec3(courtHalfWidth, courtHalfLength, 0),
+      Vec3(-courtHalfWidth, courtHalfLength, 0),
+    ];
+    final projectedCourtCorners = courtCorners.map(projector.project).toList();
+    final courtMinX = projectedCourtCorners.map((p) => p.dx).reduce(math.min);
+    final courtMaxX = projectedCourtCorners.map((p) => p.dx).reduce(math.max);
+    final courtMinY = projectedCourtCorners.map((p) => p.dy).reduce(math.min);
+    final courtMaxY = projectedCourtCorners.map((p) => p.dy).reduce(math.max);
+
+    // Also project sand corners to get minY for baseline anchoring
     final sandCorners = const [
       Vec3(-halfSandWidth, -halfSandLength, 0),
       Vec3(halfSandWidth, -halfSandLength, 0),
@@ -88,25 +105,24 @@ class BeachCourtPainter {
       Vec3(-halfSandWidth, halfSandLength, 0),
     ];
     final projectedCorners = sandCorners.map(projector.project).toList();
-    final minX = projectedCorners.map((p) => p.dx).reduce(math.min);
-    final maxX = projectedCorners.map((p) => p.dx).reduce(math.max);
     final minY = projectedCorners.map((p) => p.dy).reduce(math.min);
-    final maxY = projectedCorners.map((p) => p.dy).reduce(math.max);
+
     final viewHeightPoint = projector.project(
       const Vec3(0, 0, _viewHeightMeters),
     );
-    final topY = math.max(viewHeightPoint.dy, maxY);
-    final verticalRange = math.max(topY - minY, 0.1);
-    final horizontalRange = math.max(maxX - minX, 0.1);
+    final topY = math.max(viewHeightPoint.dy, courtMaxY);
+    final verticalRange = math.max(topY - courtMinY, 0.1);
+    final horizontalRange = math.max(courtMaxX - courtMinX, 0.1);
 
     final availableWidth = math.max(size.width - marginPx * 2, 1.0);
     final availableHeight = math.max(size.height - marginPx * 2, 1.0);
     final scaleX = availableWidth / horizontalRange;
     final scaleY = availableHeight / verticalRange;
-    final scale = math.min(scaleX, scaleY) * zoom.clamp(0.3, 3.0);
-    final lineWidth = math.max(0.6, _lineWidthMeters * scale);
-    final postWidth = math.max(2.0, _postWidthMeters * scale);
-    final meshWidth = math.max(0.8, lineWidth * 0.6);
+    final scale = math.min(scaleX, scaleY) * zoom.clamp(0.0, 5.0);
+    const double metersToPx = 0.1;
+    final lineWidth = _lineWidthMeters * scale * metersToPx;
+    final postWidth = _postWidthMeters * scale * metersToPx;
+    final meshWidth = lineWidth * 0.1;
 
     final scaleTopDown = math.min(
       availableWidth / BeachCourtMeasurements.totalSandWidth,
@@ -134,9 +150,11 @@ class BeachCourtPainter {
     Offset mapPerspective(Vec3 worldPoint) {
       final projected = projector.project(worldPoint);
       final xOffset = marginPx + (availableWidth - horizontalRange * scale) / 2;
-      final yOffset = marginPx + (availableHeight - verticalRange * scale) / 2;
+      final baselineScreenY =
+          size.height - marginPx - 30.0 * zoom.clamp(0.3, 3.0);
+      final yOffset = baselineScreenY - minY * scale;
       return Offset(
-        xOffset + (projected.dx - minX) * scale,
+        xOffset + (projected.dx - courtMinX) * scale,
         yOffset + (topY - projected.dy) * scale,
       );
     }
@@ -189,8 +207,6 @@ class BeachCourtPainter {
     _drawFootprints(canvas, mapPoint);
 
     // Draw court boundary
-    const courtHalfWidth = BeachCourtMeasurements.courtWidth / 2;
-    const courtHalfLength = BeachCourtMeasurements.courtLength / 2;
     final courtPath = buildPath(const [
       Vec3(-courtHalfWidth, -courtHalfLength, 0),
       Vec3(courtHalfWidth, -courtHalfLength, 0),
@@ -293,8 +309,12 @@ class BeachCourtPainter {
 
     final netTopStart = mapPoint(const Vec3(-netHalfLength, netPos, netHeight));
     final netTopEnd = mapPoint(const Vec3(netHalfLength, netPos, netHeight));
-    final netBottomStart = mapPoint(const Vec3(-netHalfLength, netPos, 0.2));
-    final netBottomEnd = mapPoint(const Vec3(netHalfLength, netPos, 0.2));
+    final netBottomStart = mapPoint(
+      const Vec3(-netHalfLength, netPos, netHeight / 2),
+    );
+    final netBottomEnd = mapPoint(
+      const Vec3(netHalfLength, netPos, netHeight / 2),
+    );
 
     final tapePaint = Paint()
       ..color = Colors.white
@@ -308,7 +328,7 @@ class BeachCourtPainter {
       ..color = const Color(0x66000000)
       ..strokeWidth = meshWidth;
 
-    const columns = 9;
+    const columns = 30;
     for (var i = 0; i <= columns; i++) {
       final t = i / columns;
       final top = Offset(
@@ -322,7 +342,7 @@ class BeachCourtPainter {
       canvas.drawLine(top, bottom, meshPaint);
     }
 
-    const rows = 5;
+    const rows = columns / 8;
     for (var i = 1; i < rows; i++) {
       final t = i / rows;
       final left = Offset(
@@ -346,6 +366,6 @@ class BeachCourtPainter {
       ..lineTo(netBottomEnd.dx + 18, netBottomEnd.dy + 12)
       ..lineTo(netBottomStart.dx + 18, netBottomStart.dy + 12)
       ..close();
-    canvas.drawPath(shadowPath, shadowPaint);
+    // canvas.drawPath(shadowPath, shadowPaint);
   }
 }
