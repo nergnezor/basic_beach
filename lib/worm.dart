@@ -22,11 +22,9 @@ class Worm extends BodyComponent with ContactCallbacks {
   //   // body = world.createBody(bodyDef)..createFixture(fixtureDef);
   //   body.bodyType = BodyType.dynamic;
   // }
-  late Vector2 position;
+  final Vector2 spawnPosition;
 
-  Worm(Vector2 position) : super() {
-    this.position = position;
-  }
+  Worm(this.spawnPosition) : super();
   //
 
   @override
@@ -37,22 +35,22 @@ class Worm extends BodyComponent with ContactCallbacks {
     // ..friction = wormFriction
     // ..restitution = wormRestitution;
     final bodyDef = BodyDef()
-      ..position = position
+      ..position = spawnPosition
       ..type = BodyType.dynamic;
     return world.createBody(bodyDef)..createFixture(fixtureDef);
   }
 
   @override
-  void renderCircle(Canvas canvas, Offset position, double radius) {
-    super.renderCircle(canvas, position, radius);
+  void renderCircle(Canvas canvas, Offset center, double radius) {
+    super.renderCircle(canvas, center, radius);
     final paint = Paint()..color = const Color(0xFFFF0000);
-    // canvas.drawCircle(position, radius, paint);
-    const bodyCount = 5;
+    canvas.drawCircle(center, radius, paint);
+    const bodyCount = 6;
     for (var i = 0; i < bodyCount; i++) {
-      final angle = i;
-      final x = position.dx + radius * cos(angle) / (1 + i / 10);
-      final y = position.dy + radius * sin(angle) / (1 + i / 10);
-      canvas.drawCircle(Offset(x, y), radius / i, paint);
+      final angle = (i / bodyCount) * pi * 2;
+      final x = center.dx + radius * 0.5 * cos(angle);
+      final y = center.dy + radius * 0.3 * sin(angle);
+      canvas.drawCircle(Offset(x, y), radius * 0.2, paint);
     }
   }
 
@@ -71,7 +69,7 @@ class Worm extends BodyComponent with ContactCallbacks {
     if (other is! Worm) {
       return;
     }
-    final otherWorm = other as Worm;
+    final otherWorm = other;
     if (body == otherWorm.body) {
       return;
     }

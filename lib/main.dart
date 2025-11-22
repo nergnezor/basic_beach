@@ -8,8 +8,8 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'beach_court_painter.dart';
 import 'boundaries.dart';
-import 'worm.dart';
 
 void main() {
   runApp(const GameWidget.controlled(gameFactory: MouseJointExample.new));
@@ -23,7 +23,8 @@ class MouseJointExample extends Forge2DGame {
 class MouseJointWorld extends Forge2DWorld
     with DragCallbacks, HasGameReference<Forge2DGame> {
   late final FragmentProgram program;
-  late final FragmentShader shader;
+  FragmentShader? shader;
+  late final BeachCourtPainter courtPainter;
   bool playingMusic = false;
   double time = 0;
   PositionComponent camera = PositionComponent();
@@ -38,6 +39,8 @@ class MouseJointWorld extends Forge2DWorld
 
     program = await FragmentProgram.fromAsset('shaders/bg.frag');
     shader = program.fragmentShader();
+    courtPainter = BeachCourtPainter();
+    shader = program.fragmentShader();
     // if not web
     if (!kIsWeb) {
       // FlameAudio.bgm.play('megalergik.mp3');
@@ -47,34 +50,30 @@ class MouseJointWorld extends Forge2DWorld
     // Add boundaries
     addAll(createBoundaries(game));
 
-    game.add(Worm(Vector2(game.size.x / 2, 0)));
+    // game.add(Worm(Vector2(game.size.x / 2, 0)));
     super.onLoad();
-  }
-
-  @override
-  void onDragStart(DragStartEvent info) {
-    super.onDragStart(info);
-  }
-
-  @override
-  void onDragUpdate(DragUpdateEvent info) {}
-
-  @override
-  void onDragEnd(DragEndEvent info) {
-    super.onDragEnd(info);
   }
 
   @override
   void render(Canvas canvas) {
     // Draw background gradient
-    shader
-      ..setFloat(0, time)
-      ..setFloat(1, game.camera.visibleWorldRect.width)
-      ..setFloat(2, game.camera.visibleWorldRect.height);
+    final fragment = shader;
     // final canvasRect = canvas.getLocalClipBounds();
     // final canvasRect = Rect.fromLTWH(0, 0, game.size.x, game.size.y);
     final canvasRect = game.camera.visibleWorldRect;
-    canvas.drawRect(canvasRect, Paint()..shader = shader);
+    if (fragment != null) {
+      fragment
+        ..setFloat(0, time)
+        ..setFloat(1, canvasRect.width)
+        ..setFloat(2, canvasRect.height);
+      canvas.drawRect(canvasRect, Paint()..shader = fragment);
+    } else {
+      canvas.drawRect(
+        canvasRect,
+        Paint()..color = const Color(0xFF0A1E32),
+      );
+    }
+    courtPainter.render(canvas, canvasRect);
     super.render(canvas);
   }
 

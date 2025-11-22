@@ -24,6 +24,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord)
   if (x > offset && y < -h * 0.4)
   {
     r = 1.0;
+    g = 0.7;
   }
 
   fragColor = vec4(r, g, b, a);
