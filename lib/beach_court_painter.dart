@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -41,16 +42,21 @@ class BeachCourtMeasurements {
   static const double totalSandLength = courtLength + 2 * freeZoneWidth;
 }
 
+const double _lineWidthMeters = 0.05;
+const double _postWidthMeters = 0.12;
+const double _marginFactor = 0.06;
+const double _minMarginPx = 32.0;
+
 /// Renders a beach volleyball court with official FIVB measurements
 /// from a perspective camera view.
 class BeachCourtPainter {
   BeachCourtPainter()
-      : projector = PerspectiveProjector(
-          camera: const Vec3(0, -1.5, 3),
-          target: const Vec3(0, 8, 0),
-          upHint: const Vec3(0, 0, 1),
-          focalLength: 0.9,
-        );
+    : projector = PerspectiveProjector(
+        camera: const Vec3(0, -1.5, 3),
+        target: const Vec3(0, 8, 0),
+        upHint: const Vec3(0, 0, 1),
+        focalLength: 0.9,
+      );
 
   final PerspectiveProjector projector;
 
@@ -64,13 +70,42 @@ class BeachCourtPainter {
     canvas.translate(viewport.left, viewport.top);
 
     final size = viewport.size;
-    final scale = size.shortestSide * 0.32;
-    final baseY = size.height * 0.7;
+    final marginPx = math.max(size.shortestSide * _marginFactor, _minMarginPx);
+
+    const halfSandWidth = BeachCourtMeasurements.totalSandWidth / 2;
+    const halfSandLength = BeachCourtMeasurements.totalSandLength / 2;
+    final sandCorners = const [
+      Vec3(-halfSandWidth, -halfSandLength, 0),
+      Vec3(halfSandWidth, -halfSandLength, 0),
+      Vec3(halfSandWidth, halfSandLength, 0),
+      Vec3(-halfSandWidth, halfSandLength, 0),
+    ];
+
+    final projectedCorners = sandCorners.map(projector.project).toList();
+    final minX = projectedCorners.map((p) => p.dx).reduce(math.min);
+    final maxX = projectedCorners.map((p) => p.dx).reduce(math.max);
+    final minY = projectedCorners.map((p) => p.dy).reduce(math.min);
+    final maxY = projectedCorners.map((p) => p.dy).reduce(math.max);
+
+    final horizontalRange = math.max(maxX - minX, 0.1);
+    final verticalRange = math.max(maxY - minY, 0.1);
+
+    final availableWidth = math.max(size.width - marginPx * 2, 1.0);
+    final availableHeight = math.max(size.height - marginPx * 2, 1.0);
+    final scale = math.min(
+      availableWidth / horizontalRange,
+      availableHeight / verticalRange,
+    );
+    final centerX = (minX + maxX) / 2;
+    final baseY = size.height - marginPx + minY * scale;
+    final lineWidth = math.max(0.6, _lineWidthMeters * scale);
+    final postWidth = math.max(2.0, _postWidthMeters * scale);
+    final meshWidth = math.max(0.8, lineWidth * 0.6);
 
     Offset mapPoint(Vec3 worldPoint) {
       final projected = projector.project(worldPoint);
       return Offset(
-        size.width / 2 + projected.dx * scale,
+        size.width / 2 + (projected.dx - centerX) * scale,
         baseY - projected.dy * scale,
       );
     }
@@ -87,13 +122,11 @@ class BeachCourtPainter {
     }
 
     // Draw sand area
-    const halfWidth = BeachCourtMeasurements.totalSandWidth / 2;
-    const halfLength = BeachCourtMeasurements.totalSandLength / 2;
     final sandPath = buildPath(const [
-      Vec3(-halfWidth, -halfLength, 0),
-      Vec3(halfWidth, -halfLength, 0),
-      Vec3(halfWidth, halfLength, 0),
-      Vec3(-halfWidth, halfLength, 0),
+      Vec3(-halfSandWidth, -halfSandLength, 0),
+      Vec3(halfSandWidth, -halfSandLength, 0),
+      Vec3(halfSandWidth, halfSandLength, 0),
+      Vec3(-halfSandWidth, halfSandLength, 0),
     ]);
 
     final sandPaint = Paint()
@@ -124,14 +157,14 @@ class BeachCourtPainter {
     final linePaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
+      ..strokeWidth = lineWidth
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(courtPath, linePaint);
 
     // Draw center line (dividing the two sides)
     final centerLinePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.7)
-      ..strokeWidth = 1.5;
+      ..strokeWidth = lineWidth;
     canvas.drawLine(
       mapPoint(const Vec3(-courtHalfWidth, 0, 0.02)),
       mapPoint(const Vec3(courtHalfWidth, 0, 0.02)),
@@ -142,7 +175,7 @@ class BeachCourtPainter {
     const attackLineY = BeachCourtMeasurements.attackLineDistance;
     final attackLinePaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.5)
-      ..strokeWidth = 1.0;
+      ..strokeWidth = lineWidth;
     canvas.drawLine(
       mapPoint(const Vec3(-courtHalfWidth, -attackLineY, 0.01)),
       mapPoint(const Vec3(courtHalfWidth, -attackLineY, 0.01)),
@@ -154,7 +187,7 @@ class BeachCourtPainter {
       attackLinePaint,
     );
 
-    _drawNet(canvas, mapPoint);
+    _drawNet(canvas, mapPoint, lineWidth, postWidth, meshWidth);
     _drawBall(canvas, mapPoint);
 
     canvas.restore();
@@ -183,14 +216,20 @@ class BeachCourtPainter {
     }
   }
 
-  void _drawNet(Canvas canvas, Offset Function(Vec3) mapPoint) {
+  void _drawNet(
+    Canvas canvas,
+    Offset Function(Vec3) mapPoint,
+    double tapeWidth,
+    double postWidth,
+    double meshWidth,
+  ) {
     const netHalfLength = BeachCourtMeasurements.netLength / 2;
     const netHeight = BeachCourtMeasurements.netHeight;
     const netPos = 0.0; // Center of court
 
     final postPaint = Paint()
       ..color = const Color(0xFF7C4A1F)
-      ..strokeWidth = 4
+      ..strokeWidth = postWidth
       ..strokeCap = StrokeCap.round;
 
     void drawPost(double x) {
@@ -211,7 +250,7 @@ class BeachCourtPainter {
 
     final tapePaint = Paint()
       ..color = Colors.white
-      ..strokeWidth = 3
+      ..strokeWidth = tapeWidth
       ..strokeCap = StrokeCap.round;
 
     canvas.drawLine(netTopStart, netTopEnd, tapePaint);
@@ -219,7 +258,7 @@ class BeachCourtPainter {
     // Draw net mesh
     final meshPaint = Paint()
       ..color = const Color(0x66000000)
-      ..strokeWidth = 1;
+      ..strokeWidth = meshWidth;
 
     const columns = 9;
     for (var i = 0; i <= columns; i++) {
@@ -267,11 +306,12 @@ class BeachCourtPainter {
     const ballRadius = 10.0;
 
     final ballPaint = Paint()
-      ..shader = const RadialGradient(
-        colors: [Color(0xFFFFF5C3), Color(0xFFFFC94A)],
-      ).createShader(
-        Rect.fromCircle(center: ballCenter, radius: ballRadius * 1.2),
-      );
+      ..shader =
+          const RadialGradient(
+            colors: [Color(0xFFFFF5C3), Color(0xFFFFC94A)],
+          ).createShader(
+            Rect.fromCircle(center: ballCenter, radius: ballRadius * 1.2),
+          );
     canvas.drawCircle(ballCenter, ballRadius, ballPaint);
 
     final seamPaint = Paint()
