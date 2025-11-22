@@ -44,18 +44,19 @@ class BeachCourtMeasurements {
 
 const double _lineWidthMeters = 0.05;
 const double _postWidthMeters = 0.12;
-const double _marginFactor = 0.06;
-const double _minMarginPx = 32.0;
+const double _marginFactor = 0.04;
+const double _minMarginPx = 24.0;
+const double _viewHeightMeters = 6.0;
 
 /// Renders a beach volleyball court with official FIVB measurements
 /// from a perspective camera view.
 class BeachCourtPainter {
   BeachCourtPainter()
     : projector = PerspectiveProjector(
-        camera: const Vec3(0, -1.5, 3),
-        target: const Vec3(0, 8, 0),
+        camera: const Vec3(0, -2, 3),
+        target: const Vec3(0, 6, 0),
         upHint: const Vec3(0, 0, 1),
-        focalLength: 0.9,
+        focalLength: 1.1,
       );
 
   final PerspectiveProjector projector;
@@ -85,19 +86,18 @@ class BeachCourtPainter {
     final minX = projectedCorners.map((p) => p.dx).reduce(math.min);
     final maxX = projectedCorners.map((p) => p.dx).reduce(math.max);
     final minY = projectedCorners.map((p) => p.dy).reduce(math.min);
-    final maxY = projectedCorners.map((p) => p.dy).reduce(math.max);
+    final viewHeightPoint = projector.project(
+      const Vec3(0, 0, _viewHeightMeters),
+    );
+    final verticalRange = math.max(viewHeightPoint.dy - minY, 0.1);
 
     final horizontalRange = math.max(maxX - minX, 0.1);
-    final verticalRange = math.max(maxY - minY, 0.1);
 
     final availableWidth = math.max(size.width - marginPx * 2, 1.0);
     final availableHeight = math.max(size.height - marginPx * 2, 1.0);
-    final scale = math.min(
-      availableWidth / horizontalRange,
-      availableHeight / verticalRange,
-    );
-    final centerX = (minX + maxX) / 2;
-    final baseY = size.height - marginPx + minY * scale;
+    final scaleX = availableWidth / horizontalRange;
+    final scaleY = availableHeight / verticalRange;
+    final scale = math.min(scaleX, scaleY);
     final lineWidth = math.max(0.6, _lineWidthMeters * scale);
     final postWidth = math.max(2.0, _postWidthMeters * scale);
     final meshWidth = math.max(0.8, lineWidth * 0.6);
@@ -105,8 +105,8 @@ class BeachCourtPainter {
     Offset mapPoint(Vec3 worldPoint) {
       final projected = projector.project(worldPoint);
       return Offset(
-        size.width / 2 + (projected.dx - centerX) * scale,
-        baseY - projected.dy * scale,
+        marginPx + (projected.dx - minX) * scale,
+        size.height - marginPx - (projected.dy - minY) * scale,
       );
     }
 
@@ -130,11 +130,14 @@ class BeachCourtPainter {
     ]);
 
     final sandPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFF7E2B7), Color(0xFFE7C18A)],
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
-      ).createShader(Rect.fromLTWH(0, baseY - scale, size.width, scale * 2));
+      ..shader =
+          const LinearGradient(
+            colors: [Color(0xFFF7E2B7), Color(0xFFE7C18A)],
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+          ).createShader(
+            Rect.fromLTWH(0, marginPx, size.width, size.height - marginPx * 2),
+          );
     canvas.drawPath(sandPath, sandPaint);
 
     _drawFootprints(canvas, mapPoint);
@@ -188,7 +191,6 @@ class BeachCourtPainter {
     );
 
     _drawNet(canvas, mapPoint, lineWidth, postWidth, meshWidth);
-    _drawBall(canvas, mapPoint);
 
     canvas.restore();
   }
@@ -299,38 +301,5 @@ class BeachCourtPainter {
       ..lineTo(netBottomStart.dx + 18, netBottomStart.dy + 12)
       ..close();
     canvas.drawPath(shadowPath, shadowPaint);
-  }
-
-  void _drawBall(Canvas canvas, Offset Function(Vec3) mapPoint) {
-    final ballCenter = mapPoint(const Vec3(-1.0, 6.0, 0.3));
-    const ballRadius = 10.0;
-
-    final ballPaint = Paint()
-      ..shader =
-          const RadialGradient(
-            colors: [Color(0xFFFFF5C3), Color(0xFFFFC94A)],
-          ).createShader(
-            Rect.fromCircle(center: ballCenter, radius: ballRadius * 1.2),
-          );
-    canvas.drawCircle(ballCenter, ballRadius, ballPaint);
-
-    final seamPaint = Paint()
-      ..color = const Color(0xFF1C1C1C)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    canvas.drawArc(
-      Rect.fromCircle(center: ballCenter, radius: ballRadius),
-      -0.7,
-      2.6,
-      false,
-      seamPaint,
-    );
-    canvas.drawArc(
-      Rect.fromCircle(center: ballCenter, radius: ballRadius * 0.9),
-      1.1,
-      2.4,
-      false,
-      seamPaint,
-    );
   }
 }

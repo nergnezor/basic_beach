@@ -8,6 +8,7 @@ import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ball.dart';
 import 'beach_court_painter.dart';
 import 'boundaries.dart';
 
@@ -17,7 +18,7 @@ void main() {
 
 class MouseJointExample extends Forge2DGame {
   MouseJointExample()
-      : super(world: MouseJointWorld(), gravity: Vector2(0, 80));
+    : super(world: MouseJointWorld(), gravity: Vector2(0, 80));
 }
 
 class MouseJointWorld extends Forge2DWorld
@@ -28,8 +29,10 @@ class MouseJointWorld extends Forge2DWorld
   bool playingMusic = false;
   double time = 0;
   PositionComponent camera = PositionComponent();
-  TextComponent lifeText =
-      TextComponent(text: "100", position: Vector2(30, 20));
+  TextComponent lifeText = TextComponent(
+    text: "100",
+    position: Vector2(30, 20),
+  );
 
   @override
   Future<void> onLoad() async {
@@ -47,8 +50,10 @@ class MouseJointWorld extends Forge2DWorld
       playingMusic = true;
     }
 
-    // Add boundaries
+    // Add boundaries and sand floor
     addAll(createBoundaries(game));
+    add(SandFloor(height: 5.8));
+    add(BouncingBall(Vector2(0, -4)));
 
     // game.add(Worm(Vector2(game.size.x / 2, 0)));
     super.onLoad();
@@ -68,10 +73,7 @@ class MouseJointWorld extends Forge2DWorld
         ..setFloat(2, canvasRect.height);
       canvas.drawRect(canvasRect, Paint()..shader = fragment);
     } else {
-      canvas.drawRect(
-        canvasRect,
-        Paint()..color = const Color(0xFF0A1E32),
-      );
+      canvas.drawRect(canvasRect, Paint()..color = const Color(0xFF0A1E32));
     }
     courtPainter.render(canvas, canvasRect);
     super.render(canvas);
