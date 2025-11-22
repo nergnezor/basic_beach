@@ -53,16 +53,18 @@ const double _viewHeightMeters = 6.0;
 /// with a blend between top-down and perspective projections.
 class BeachCourtPainter {
   BeachCourtPainter()
-      : projector = PerspectiveProjector(
-          camera: const Vec3(0, -14, 5),
-          target: const Vec3(0, 6, 0),
-          upHint: const Vec3(0, 0, 1),
-          focalLength: 1.1,
-        ),
-      viewBlend = 0.0;
+    : projector = PerspectiveProjector(
+        camera: const Vec3(0, -14, 5),
+        target: const Vec3(0, 6, 0),
+        upHint: const Vec3(0, 0, 1),
+        focalLength: 1.1,
+      ),
+      viewBlend = 0.0,
+      zoom = 1.0;
 
   final PerspectiveProjector projector;
   double viewBlend;
+  double zoom;
 
   void render(Canvas canvas, Rect viewport) {
     if (viewport.isEmpty) {
@@ -101,7 +103,7 @@ class BeachCourtPainter {
     final availableHeight = math.max(size.height - marginPx * 2, 1.0);
     final scaleX = availableWidth / horizontalRange;
     final scaleY = availableHeight / verticalRange;
-    final scale = math.min(scaleX, scaleY);
+    final scale = math.min(scaleX, scaleY) * zoom.clamp(0.3, 3.0);
     final lineWidth = math.max(0.6, _lineWidthMeters * scale);
     final postWidth = math.max(2.0, _postWidthMeters * scale);
     final meshWidth = math.max(0.8, lineWidth * 0.6);

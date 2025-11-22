@@ -14,12 +14,62 @@ import 'beach_court_painter.dart';
 import 'boundaries.dart';
 
 void main() {
-  runApp(const GameWidget.controlled(gameFactory: MouseJointExample.new));
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: GameWidget<MouseJointExample>.controlled(
+          gameFactory: MouseJointExample.new,
+          overlayBuilderMap: {
+            'zoomOverlay': (context, game) => Align(
+              alignment: Alignment.bottomRight,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FloatingActionButton.small(
+                      heroTag: 'zoom_in',
+                      onPressed: () {
+                        (game.world as MouseJointWorld).changeZoom(1.1);
+                      },
+                      child: const Icon(Icons.add),
+                    ),
+                    const SizedBox(height: 8),
+                    FloatingActionButton.small(
+                      heroTag: 'zoom_out',
+                      onPressed: () {
+                        (game.world as MouseJointWorld).changeZoom(1 / 1.1);
+                      },
+                      child: const Icon(Icons.remove),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          },
+        ),
+      ),
+    );
+  }
 }
 
 class MouseJointExample extends Forge2DGame with KeyboardEvents {
   MouseJointExample()
-      : super(world: MouseJointWorld(), gravity: Vector2(0, 80));
+    : super(world: MouseJointWorld(), gravity: Vector2(0, 80));
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    overlays.add('zoomOverlay');
+  }
 
   MouseJointWorld get _mouseJointWorld => world as MouseJointWorld;
 
@@ -28,8 +78,7 @@ class MouseJointExample extends Forge2DGame with KeyboardEvents {
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.keyV) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyV) {
       _mouseJointWorld.togglePerspectiveTarget();
       return KeyEventResult.handled;
     }
@@ -38,7 +87,7 @@ class MouseJointExample extends Forge2DGame with KeyboardEvents {
 }
 
 class MouseJointWorld extends Forge2DWorld
-  with DragCallbacks, HasGameReference<Forge2DGame> {
+    with DragCallbacks, HasGameReference<Forge2DGame> {
   late final FragmentProgram program;
   FragmentShader? shader;
   late final BeachCourtPainter courtPainter;
@@ -53,6 +102,10 @@ class MouseJointWorld extends Forge2DWorld
   final double _blendSpeed = 0.8;
   void togglePerspectiveTarget() {
     _targetBlend = (_targetBlend >= 0.5) ? 0.0 : 1.0;
+  }
+
+  void changeZoom(double factor) {
+    courtPainter.zoom = (courtPainter.zoom * factor).clamp(0.3, 3.0);
   }
 
   @override
@@ -115,8 +168,7 @@ class MouseJointWorld extends Forge2DWorld
       return;
     }
     final direction = difference.sign;
-    courtPainter.viewBlend = (courtPainter.viewBlend +
-            direction * _blendSpeed * dt)
-        .clamp(0.0, 1.0);
+    courtPainter.viewBlend =
+        (courtPainter.viewBlend + direction * _blendSpeed * dt).clamp(0.0, 1.0);
   }
 }
