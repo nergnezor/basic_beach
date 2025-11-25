@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 
@@ -150,6 +151,18 @@ class MouseJointWorld extends Forge2DWorld
     } else {
       canvas.drawRect(canvasRect, Paint()..color = const Color(0xFF0A1E32));
     }
+    // Compute zoom from window width so zoom changes with window resizing.
+    // Example: width 1000 -> zoom 1.0; clamp to reasonable bounds.
+    final ratio = canvasRect.height / canvasRect.width;
+    final w = canvasRect.width;
+    final h = canvasRect.height;
+    final computedZoom = pow(w, -0.1).toDouble();
+    debugPrint(
+      "Window size: ${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}, "
+      "ratio: ${ratio.toStringAsFixed(3)}, computedZoom: ${computedZoom.toStringAsFixed(3)}",
+    );
+
+    courtPainter.zoom = computedZoom;
     courtPainter.render(canvas, canvasRect);
     super.render(canvas);
   }

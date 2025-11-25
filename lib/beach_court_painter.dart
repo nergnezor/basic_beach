@@ -54,7 +54,7 @@ const double _viewHeightMeters = 6.0;
 class BeachCourtPainter {
   BeachCourtPainter()
     : projector = PerspectiveProjector(
-        camera: const Vec3(0, -20, 15),
+        camera: const Vec3(0, -60, 15),
         target: const Vec3(0, -10, 0),
         upHint: const Vec3(0, 0, 1),
         focalLength: 1.8,
@@ -356,16 +356,6 @@ class BeachCourtPainter {
       canvas.drawLine(left, right, meshPaint);
     }
 
-    // Draw net shadow
-    final shadowPaint = Paint()
-      ..color = const Color(0x33131313)
-      ..style = PaintingStyle.fill;
-    final shadowPath = Path()
-      ..moveTo(netBottomStart.dx, netBottomStart.dy)
-      ..lineTo(netBottomEnd.dx, netBottomEnd.dy)
-      ..lineTo(netBottomEnd.dx + 18, netBottomEnd.dy + 12)
-      ..lineTo(netBottomStart.dx + 18, netBottomStart.dy + 12)
-      ..close();
-    // canvas.drawPath(shadowPath, shadowPaint);
+    // Net shadow intentionally not drawn.
   }
 }
