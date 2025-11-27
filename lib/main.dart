@@ -121,8 +121,12 @@ class MouseJointWorld extends Forge2DWorld
     final ratio = h / w;
 
     // Example zoom formula (can be tuned): smaller width -> slightly larger zoom
-    final computedZoom = math.pow(w, 1).toDouble();
-    final yOffset = -(w * 0.03) / (ratio);
+    var computedZoom = math.pow(w, 0.02).toDouble();
+    var yOffset = -(w * 0.015);
+
+    if (ratio > 1) {
+      // Portrait adjustments
+    }
 
     debugPrint(
       "Metrics changed: ${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}, "
@@ -202,6 +206,7 @@ class MouseJointWorld extends Forge2DWorld
     _updateCourtBlend(dt);
     time += dt;
     super.update(dt);
+    _updateSize();
   }
 
   void _updateCourtBlend(double dt) {
