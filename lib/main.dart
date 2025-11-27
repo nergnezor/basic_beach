@@ -9,9 +9,9 @@ import 'package:flame/game.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sylt11/draw_court.dart';
 
 import 'ball.dart';
-import 'beach_court_painter.dart';
 import 'boundaries.dart';
 
 void main() {
@@ -91,7 +91,6 @@ class MouseJointWorld extends Forge2DWorld
     with DragCallbacks, HasGameReference<Forge2DGame>, WidgetsBindingObserver {
   late final FragmentProgram program;
   FragmentShader? shader;
-  late final BeachCourtPainter courtPainter;
   bool playingMusic = false;
   double time = 0;
   PositionComponent camera = PositionComponent();
@@ -100,7 +99,6 @@ class MouseJointWorld extends Forge2DWorld
     position: Vector2(30, 20),
   );
   double _targetBlend = 1;
-  final double _blendSpeed = 0.8;
   Size? _lastLogicalSize;
 
   @override
@@ -132,9 +130,6 @@ class MouseJointWorld extends Forge2DWorld
       "Metrics changed: ${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}, "
       "ratio: ${ratio.toStringAsFixed(3)}, computedZoom: ${computedZoom.toStringAsFixed(3)}, yOffset: ${yOffset.toStringAsFixed(3)}",
     );
-
-    courtPainter.zoom = computedZoom;
-    courtPainter.yOffset = yOffset;
   }
 
   @override
@@ -147,9 +142,7 @@ class MouseJointWorld extends Forge2DWorld
     _targetBlend = (_targetBlend >= 0.5) ? 0.0 : 1.0;
   }
 
-  void changeZoom(double factor) {
-    courtPainter.zoom = (courtPainter.zoom * factor).clamp(0.3, 3.0);
-  }
+  void changeZoom(double factor) {}
 
   @override
   Future<void> onLoad() async {
@@ -159,8 +152,6 @@ class MouseJointWorld extends Forge2DWorld
 
     program = await FragmentProgram.fromAsset('shaders/bg.frag');
     shader = program.fragmentShader();
-    courtPainter = BeachCourtPainter();
-    courtPainter.viewBlend = 0;
     shader = program.fragmentShader();
     // Initialize size-dependent camera/zoom once and listen for future resizes
     _updateSize();
@@ -196,27 +187,48 @@ class MouseJointWorld extends Forge2DWorld
     } else {
       canvas.drawRect(canvasRect, Paint()..color = const Color(0xFF0A1E32));
     }
-    // Zoom and yOffset are updated in _updateSize() when the window metrics change.
-    courtPainter.render(canvas, canvasRect);
+    drawCourt(canvas, canvasRect);
     super.render(canvas);
   }
 
   @override
   void update(double dt) {
-    _updateCourtBlend(dt);
     time += dt;
     super.update(dt);
-    _updateSize();
   }
+}
 
-  void _updateCourtBlend(double dt) {
-    final difference = _targetBlend - courtPainter.viewBlend;
-    if (difference.abs() < 0.001) {
-      courtPainter.viewBlend = _targetBlend;
-      return;
-    }
-    final direction = difference.sign;
-    courtPainter.viewBlend =
-        (courtPainter.viewBlend + direction * _blendSpeed * dt).clamp(0.0, 1.0);
-  }
+void drawCourt(Canvas canvas, Rect canvasRect) {
+  final paint = Paint()
+    ..color = const Color(0xFFFFFFFF)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 2.0;
+
+  final courtWidth = 20.0;
+  final courtHeight = 10.0;
+  final centerX = 0.0;
+  final centerY = 0.0;
+  final frontToBackRatio = 2;
+  final courtDisplayCoverageHeightRatio = 0.6;
+
+  //   final rect = Rect.fromCenter(
+  //     center: Offset(centerX, centerY),
+  //     width: courtWidth,
+  //     height: courtHeight,
+  //   );
+  final perspectivePolygon = [
+    Offset(centerX - courtWidth / 2, centerY - courtHeight / 2 * 0.6),
+    Offset(centerX + courtWidth / 2, centerY - courtHeight / 2 * 0.6),
+    Offset(centerX + courtWidth / 2, centerY + courtHeight / 2 * 1.4),
+    Offset(centerX - courtWidth / 2, centerY + courtHeight / 2 * 1.4),
+  ];
+  canvas.drawPoints(PointMode.polygon, perspectivePolygon, paint);
+  // Draw back line
+  //   canvas.drawLine(
+  //     Offset(rect.left, rect.top),
+  //     Offset(rect.right, rect.top),
+  //     paint,
+  //   );
+
+  // Draw front line
 }
