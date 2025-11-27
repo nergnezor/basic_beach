@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'math_utils.dart';
 
-/// Official FIVB Beach Volleyball Court measurements (in meters).
+/// Official FIVB Beach Volleyball measurements (in meters).
 /// Reference: FIVB Beach Volleyball Rules, Court dimensions section.
 class BeachCourtMeasurements {
   /// Court length (baseline to baseline)
@@ -52,24 +52,35 @@ const double _viewHeightMeters = 6.0;
 /// Renders a beach volleyball court with official FIVB measurements
 /// with a blend between top-down and perspective projections.
 class BeachCourtPainter {
-  BeachCourtPainter()
-    : projector = PerspectiveProjector(
-        camera: const Vec3(0, -60, 15),
-        target: const Vec3(0, -10, 0),
-        upHint: const Vec3(0, 0, 1),
-        focalLength: 1.8,
-      ),
-      viewBlend = 0.0,
-      zoom = 2.0;
+  BeachCourtPainter() {
+    projector = PerspectiveProjector(
+      camera: Vec3(0, -60, 15),
+      target: const Vec3(0, -10, 0),
+      upHint: const Vec3(0, 0, 1),
+      focalLength: 1.8,
+    );
+  }
 
-  final PerspectiveProjector projector;
-  double viewBlend;
-  double zoom;
+  late PerspectiveProjector projector;
+  double viewBlend = 0.0;
+  double zoom = 2.0;
+
+  double yOffset = 0.0;
 
   void render(Canvas canvas, Rect viewport) {
     if (viewport.isEmpty) {
       return;
     }
+
+    // Update projector camera using yOffset each frame (moves camera up/down)
+    final baseCamera = Vec3(0, -60, 15);
+    final cam = Vec3(baseCamera.x, baseCamera.y, baseCamera.z);
+    projector = PerspectiveProjector(
+      camera: cam,
+      target: Vec3(0, yOffset, 0),
+      upHint: const Vec3(0, 0, 1),
+      focalLength: 1.8,
+    );
 
     canvas.save();
     canvas.clipRect(viewport);

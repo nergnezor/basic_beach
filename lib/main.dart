@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/services.dart';
 
@@ -88,7 +88,7 @@ class MouseJointExample extends Forge2DGame with KeyboardEvents {
 }
 
 class MouseJointWorld extends Forge2DWorld
-    with DragCallbacks, HasGameReference<Forge2DGame> {
+    with DragCallbacks, HasGameReference<Forge2DGame>, WidgetsBindingObserver {
   late final FragmentProgram program;
   FragmentShader? shader;
   late final BeachCourtPainter courtPainter;
@@ -101,6 +101,44 @@ class MouseJointWorld extends Forge2DWorld
   );
   double _targetBlend = 1;
   final double _blendSpeed = 0.8;
+  Size? _lastLogicalSize;
+
+  @override
+  void didChangeMetrics() {
+    _updateSize();
+  }
+
+  void _updateSize() {
+    final view = PlatformDispatcher.instance.views.first;
+    final logicalSize = view.physicalSize / view.devicePixelRatio;
+    if (_lastLogicalSize != null && _lastLogicalSize == logicalSize) {
+      return; // no change
+    }
+    _lastLogicalSize = logicalSize;
+
+    final w = logicalSize.width;
+    final h = logicalSize.height;
+    final ratio = h / w;
+
+    // Example zoom formula (can be tuned): smaller width -> slightly larger zoom
+    final computedZoom = math.pow(w, 1).toDouble();
+    final yOffset = -(w * 0.03) / (ratio);
+
+    debugPrint(
+      "Metrics changed: ${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}, "
+      "ratio: ${ratio.toStringAsFixed(3)}, computedZoom: ${computedZoom.toStringAsFixed(3)}, yOffset: ${yOffset.toStringAsFixed(3)}",
+    );
+
+    courtPainter.zoom = computedZoom;
+    courtPainter.yOffset = yOffset;
+  }
+
+  @override
+  void onRemove() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onRemove();
+  }
+
   void togglePerspectiveTarget() {
     _targetBlend = (_targetBlend >= 0.5) ? 0.0 : 1.0;
   }
@@ -120,6 +158,9 @@ class MouseJointWorld extends Forge2DWorld
     courtPainter = BeachCourtPainter();
     courtPainter.viewBlend = 0;
     shader = program.fragmentShader();
+    // Initialize size-dependent camera/zoom once and listen for future resizes
+    _updateSize();
+    WidgetsBinding.instance.addObserver(this);
     // if not web
     if (!kIsWeb) {
       // FlameAudio.bgm.play('megalergik.mp3');
@@ -151,18 +192,7 @@ class MouseJointWorld extends Forge2DWorld
     } else {
       canvas.drawRect(canvasRect, Paint()..color = const Color(0xFF0A1E32));
     }
-    // Compute zoom from window width so zoom changes with window resizing.
-    // Example: width 1000 -> zoom 1.0; clamp to reasonable bounds.
-    final ratio = canvasRect.height / canvasRect.width;
-    final w = canvasRect.width;
-    final h = canvasRect.height;
-    final computedZoom = pow(w, -0.1).toDouble();
-    debugPrint(
-      "Window size: ${w.toStringAsFixed(1)}x${h.toStringAsFixed(1)}, "
-      "ratio: ${ratio.toStringAsFixed(3)}, computedZoom: ${computedZoom.toStringAsFixed(3)}",
-    );
-
-    courtPainter.zoom = computedZoom;
+    // Zoom and yOffset are updated in _updateSize() when the window metrics change.
     courtPainter.render(canvas, canvasRect);
     super.render(canvas);
   }
