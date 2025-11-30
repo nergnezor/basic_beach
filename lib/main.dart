@@ -202,33 +202,43 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
   final paint = Paint()
     ..color = const Color(0xFFFFFFFF)
     ..style = PaintingStyle.stroke
-    ..strokeWidth = 2.0;
+    ..strokeWidth = 1.0;
 
-  final courtWidth = 20.0;
-  final courtHeight = 10.0;
-  final centerX = 0.0;
-  final centerY = 0.0;
-  final frontToBackRatio = 2;
-  final courtDisplayCoverageHeightRatio = 0.6;
+  final courtWidthCenter = canvasRect.width * 0.4;
+  final edgeToCenterWidthFactor = 2;
+  final courtWidthFront = courtWidthCenter * edgeToCenterWidthFactor;
+  final courtWidthBack = courtWidthCenter / edgeToCenterWidthFactor;
 
-  //   final rect = Rect.fromCenter(
-  //     center: Offset(centerX, centerY),
-  //     width: courtWidth,
-  //     height: courtHeight,
-  //   );
-  final perspectivePolygon = [
-    Offset(centerX - courtWidth / 2, centerY - courtHeight / 2 * 0.6),
-    Offset(centerX + courtWidth / 2, centerY - courtHeight / 2 * 0.6),
-    Offset(centerX + courtWidth / 2, centerY + courtHeight / 2 * 1.4),
-    Offset(centerX - courtWidth / 2, centerY + courtHeight / 2 * 1.4),
-  ];
-  canvas.drawPoints(PointMode.polygon, perspectivePolygon, paint);
+  final courtHeight = canvasRect.width * 0.5;
+  final bottomPadding = courtHeight * 0.2;
+  final yBottom = canvasRect.height / 2 - bottomPadding;
+
   // Draw back line
-  //   canvas.drawLine(
-  //     Offset(rect.left, rect.top),
-  //     Offset(rect.right, rect.top),
-  //     paint,
-  //   );
+  final backLineY = yBottom - courtHeight;
+  canvas.drawLine(
+    Offset(-courtWidthBack / 2, backLineY),
+    Offset(courtWidthBack / 2, backLineY),
+    paint..strokeWidth = 0.5,
+  );
 
   // Draw front line
+  final frontLineY = yBottom;
+  canvas.drawLine(
+    Offset(-courtWidthFront / 2, frontLineY),
+    Offset(courtWidthFront / 2, frontLineY),
+    paint..strokeWidth = 2,
+  );
+
+  final courtPoly = Path()
+    ..moveTo(-courtWidthBack / 2, backLineY)
+    ..lineTo(courtWidthBack / 2, backLineY)
+    ..lineTo(courtWidthFront / 2, frontLineY)
+    ..lineTo(-courtWidthFront / 2, frontLineY)
+    ..close();
+  canvas.drawPath(
+    courtPoly,
+    paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF228B22).withOpacity(0.3),
+  );
 }
