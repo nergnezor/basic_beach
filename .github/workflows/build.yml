@@ -14,8 +14,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # env:
-    #   itch_game: RabbidWorms
+    env:
+      repo_name: basic_beach
     steps:
       - uses: actions/checkout@main
       - uses: subosito/flutter-action@main
@@ -23,8 +23,9 @@ jobs:
           channel: 'main'
       - run: flutter pub get
       - run: flutter create --platforms web .
-    #   - run: flutter build web --release --base-href=/${{ env.itch_game }}/ --web-renderer=canvaskit
-      - run: flutter build web --release
+      - run: flutter build web --release --base-href=/${{ env.repo_name }}/ 
+	#   --web-renderer=canvaskit
+    #   - run: flutter build web --release
       
       - name: Setup Pages
         uses: actions/configure-pages@main
@@ -43,7 +44,7 @@ jobs:
     #   - uses: manleydev/butler-publish-itchio-action@master
     #     env:
     #       BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
-    #       ITCH_GAME: ${{ env.itch_game }}
+    #       ITCH_GAME: ${{ env.repo_name }}
     #       ITCH_USER: nergnezor
     #       PACKAGE: build/web
     #       CHANNEL: html5
