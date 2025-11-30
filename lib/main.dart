@@ -9,7 +9,6 @@ import 'package:flame/game.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:sylt11/draw_court.dart';
 
 import 'ball.dart';
 import 'boundaries.dart';
