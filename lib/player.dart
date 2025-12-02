@@ -59,21 +59,53 @@ class Player extends BodyComponent {
     final layout = computeCourtLayout(rect);
     final poly = isTopRow ? layout.topPolygon : layout.bottomPolygon;
 
-    // Compute AABB of polygon
-    double minX = poly.first.dx, maxX = poly.first.dx;
-    double minY = poly.first.dy, maxY = poly.first.dy;
-    for (final o in poly) {
-      if (o.dx < minX) minX = o.dx;
-      if (o.dx > maxX) maxX = o.dx;
-      if (o.dy < minY) minY = o.dy;
-      if (o.dy > maxY) maxY = o.dy;
+    // Helper lambdas for polygon tests (convex quad/rhombus)
+    bool _pointInPoly(Offset p, List<Offset> verts) {
+      // Convex polygon, check all edges sign
+      bool? sign;
+      for (int i = 0; i < verts.length; i++) {
+        final a = verts[i];
+        final b = verts[(i + 1) % verts.length];
+        final cross =
+            (b.dx - a.dx) * (p.dy - a.dy) - (b.dy - a.dy) * (p.dx - a.dx);
+        final s = cross >= 0;
+        sign ??= s;
+        if (sign != s) return false;
+      }
+      return true;
     }
 
-    // Use this AABB instead of earlier side/row limits
-    final sideLeftLimit = minX;
-    final sideRightLimit = maxX;
-    final rowTopLimit = minY;
-    final rowBottomLimit = maxY;
+    Offset _closestPointOnSegment(Offset p, Offset a, Offset b) {
+      final abx = b.dx - a.dx;
+      final aby = b.dy - a.dy;
+      final apx = p.dx - a.dx;
+      final apy = p.dy - a.dy;
+      final abLen2 = abx * abx + aby * aby;
+      if (abLen2 == 0) return a;
+      double t = (apx * abx + apy * aby) / abLen2;
+      t = t.clamp(0.0, 1.0);
+      return Offset(a.dx + t * abx, a.dy + t * aby);
+    }
+
+    Offset _projectToPoly(Offset p, List<Offset> verts) {
+      // If inside, return as is; else project to nearest edge
+      if (_pointInPoly(p, verts)) return p;
+      Offset best = verts.first;
+      double bestDist2 = double.infinity;
+      for (int i = 0; i < verts.length; i++) {
+        final a = verts[i];
+        final b = verts[(i + 1) % verts.length];
+        final q = _closestPointOnSegment(p, a, b);
+        final dx = q.dx - p.dx;
+        final dy = q.dy - p.dy;
+        final d2 = dx * dx + dy * dy;
+        if (d2 < bestDist2) {
+          bestDist2 = d2;
+          best = q;
+        }
+      }
+      return best;
+    }
 
     // Initiera slumpmässig riktning ibland
     if (_walkDirection.length2 == 0) {
@@ -96,23 +128,21 @@ class Player extends BodyComponent {
     final headPos = body.position;
     final footPos = headPos + Vector2(0, footOffsetWorld);
 
+    // Project foot into polygon if outside, and reflect direction on escape
     var clampedFoot = footPos;
-
-    // Kontrollera kollision på fotnivå och vänd/reflektera riktning
-    if (clampedFoot.x <= sideLeftLimit && _walkDirection.x < 0) {
-      _walkDirection.x = -_walkDirection.x;
-      clampedFoot.x = sideLeftLimit;
-    } else if (clampedFoot.x >= sideRightLimit && _walkDirection.x > 0) {
-      _walkDirection.x = -_walkDirection.x;
-      clampedFoot.x = sideRightLimit;
-    }
-
-    if (clampedFoot.y <= rowTopLimit && _walkDirection.y < 0) {
-      _walkDirection.y = -_walkDirection.y;
-      clampedFoot.y = rowTopLimit;
-    } else if (clampedFoot.y >= rowBottomLimit && _walkDirection.y > 0) {
-      _walkDirection.y = -_walkDirection.y;
-      clampedFoot.y = rowBottomLimit;
+    final footOffset = Offset(clampedFoot.x, clampedFoot.y);
+    final wasInside = _pointInPoly(footOffset, poly);
+    if (!wasInside) {
+      final projected = _projectToPoly(footOffset, poly);
+      // Simple reflection: invert component that crossed farthest
+      final dx = footOffset.dx - projected.dx;
+      final dy = footOffset.dy - projected.dy;
+      if (dx.abs() > dy.abs()) {
+        _walkDirection.x = -_walkDirection.x;
+      } else {
+        _walkDirection.y = -_walkDirection.y;
+      }
+      clampedFoot = Vector2(projected.dx, projected.dy);
     }
 
     // Flytta tillbaka huvudets center från den klampade fotpositionen
@@ -120,16 +150,11 @@ class Player extends BodyComponent {
     body.setTransform(newHeadPos, body.angle);
 
     // Ibland randomisera riktning lite för mer “levande” rörelse
-    if (isTopRow) {
-      if (math.Random().nextDouble() < 0.02) {
-        final jitterAngle = (math.Random().nextDouble() - 0.5) * 0.5;
-        final currentAngle = math.atan2(_walkDirection.y, _walkDirection.x);
-        final newAngle = currentAngle + jitterAngle;
-        _walkDirection.setValues(math.cos(newAngle), math.sin(newAngle));
-      }
-    } else {
-      // Nedre rad kan stå still eller gå bara lite
-      _walkDirection.setValues(0, 0);
+    if (math.Random().nextDouble() < 0.02) {
+      final jitterAngle = (math.Random().nextDouble() - 0.5) * 0.5;
+      final currentAngle = math.atan2(_walkDirection.y, _walkDirection.x);
+      final newAngle = currentAngle + jitterAngle;
+      _walkDirection.setValues(math.cos(newAngle), math.sin(newAngle));
     }
 
     if (_walkDirection.length2 > 0) {
