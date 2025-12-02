@@ -53,29 +53,27 @@ class Player extends BodyComponent {
       return;
     }
 
-    // Hämta court-rektangel i världens koordinater
     final rect = game.camera.visibleWorldRect;
-
     final layout = computeCourtLayout(rect);
     final poly = isTopRow ? layout.topPolygon : layout.bottomPolygon;
 
-    // Helper lambdas for polygon tests (convex quad/rhombus)
-    bool _pointInPoly(Offset p, List<Offset> verts) {
-      // Convex polygon, check all edges sign
+    // Helper lambdas for polygon tests
+    bool pointInPoly(Offset p, List<Offset> verts) {
       bool? sign;
       for (int i = 0; i < verts.length; i++) {
         final a = verts[i];
         final b = verts[(i + 1) % verts.length];
         final cross =
             (b.dx - a.dx) * (p.dy - a.dy) - (b.dy - a.dy) * (p.dx - a.dx);
-        final s = cross >= 0;
+        if (cross == 0) continue;
+        final s = cross > 0;
         sign ??= s;
         if (sign != s) return false;
       }
       return true;
     }
 
-    Offset _closestPointOnSegment(Offset p, Offset a, Offset b) {
+    Offset closestPointOnSegment(Offset p, Offset a, Offset b) {
       final abx = b.dx - a.dx;
       final aby = b.dy - a.dy;
       final apx = p.dx - a.dx;
@@ -87,15 +85,14 @@ class Player extends BodyComponent {
       return Offset(a.dx + t * abx, a.dy + t * aby);
     }
 
-    Offset _projectToPoly(Offset p, List<Offset> verts) {
-      // If inside, return as is; else project to nearest edge
-      if (_pointInPoly(p, verts)) return p;
+    Offset projectToPoly(Offset p, List<Offset> verts) {
+      if (pointInPoly(p, verts)) return p;
       Offset best = verts.first;
       double bestDist2 = double.infinity;
       for (int i = 0; i < verts.length; i++) {
         final a = verts[i];
         final b = verts[(i + 1) % verts.length];
-        final q = _closestPointOnSegment(p, a, b);
+        final q = closestPointOnSegment(p, a, b);
         final dx = q.dx - p.dx;
         final dy = q.dy - p.dy;
         final d2 = dx * dx + dy * dy;
@@ -107,60 +104,83 @@ class Player extends BodyComponent {
       return best;
     }
 
-    // Initiera slumpmässig riktning ibland
+    // --- Main Update Logic ---
+
+    // Set walk direction if needed
     if (_walkDirection.length2 == 0) {
       final angle = math.Random().nextDouble() * 2 * math.pi;
       _walkDirection = Vector2(math.cos(angle), math.sin(angle));
     }
 
-    // Beräkna skalan på samma sätt som i renderCircle, baserat på
-    // kroppens globala y mellan backLine och frontLine.
-    final back = layout.backLineY;
-    final front = layout.frontLineY;
-    final yWorld = body.position.y;
-    final t = ((yWorld - back) / (front - back)).clamp(0.0, 1.0);
-    final scale = lerpDouble(0.5, 4, t)!;
-
-    // Uppskatta fotposition i världens koordinater. Kroppen ritas från
-    // huvud (center) nedåt ~5 * scaledRadius.
-    final scaledRadius = _radius * scale;
-    final double footOffsetWorld = 13.0 * scaledRadius;
-    final headPos = body.position;
-    final footPos = headPos + Vector2(0, footOffsetWorld);
-
-    // Project foot into polygon if outside, and reflect direction on escape
-    var clampedFoot = footPos;
-    final footOffset = Offset(clampedFoot.x, clampedFoot.y);
-    final wasInside = _pointInPoly(footOffset, poly);
-    if (!wasInside) {
-      final projected = _projectToPoly(footOffset, poly);
-      // Simple reflection: invert component that crossed farthest
-      final dx = footOffset.dx - projected.dx;
-      final dy = footOffset.dy - projected.dy;
-      if (dx.abs() > dy.abs()) {
-        _walkDirection.x = -_walkDirection.x;
-      } else {
-        _walkDirection.y = -_walkDirection.y;
-      }
-      clampedFoot = Vector2(projected.dx, projected.dy);
+    // Apply velocity
+    if (_walkDirection.length2 > 0) {
+      body.linearVelocity = _walkDirection.normalized() * _walkSpeed;
+    } else {
+      body.linearVelocity = Vector2.zero();
     }
 
-    // Flytta tillbaka huvudets center från den klampade fotpositionen
-    final newHeadPos = clampedFoot - Vector2(0, footOffsetWorld);
-    body.setTransform(newHeadPos, body.angle);
+    // --- Boundary Collision and Correction ---
+    final headPos = body.position.clone();
+    final back = layout.backLineY;
+    final front = layout.frontLineY;
+    final stepSpeed = 4.0;
+    final phase = autoWalk ? _time * stepSpeed : 0.0;
 
-    // Ibland randomisera riktning lite för mer “levande” rörelse
+    final footPos = _calculateFootPos(headPos, back, front, phase);
+    final footOffset = Offset(footPos.x, footPos.y);
+
+    if (!pointInPoly(footOffset, poly)) {
+      final projectedFootOffset = projectToPoly(footOffset, poly);
+      final targetFootPos = Vector2(
+        projectedFootOffset.dx,
+        projectedFootOffset.dy,
+      );
+
+      // --- Iterative Solver ---
+      // We iteratively adjust the head position to move the foot to the target position.
+      // This is more robust than a single complex calculation.
+      var correctedHeadPos = headPos.clone();
+      const iterations = 5;
+
+      for (int i = 0; i < iterations; i++) {
+        // Calculate the foot position based on our current guess for the head.
+        final currentFootPos = _calculateFootPos(
+          correctedHeadPos,
+          back,
+          front,
+          phase,
+        );
+        // Find the error between where the foot is and where we want it to be.
+        final error = targetFootPos - currentFootPos;
+        // Apply that error to our head position guess.
+        correctedHeadPos.add(error);
+      }
+
+      body.setTransform(correctedHeadPos, body.angle);
+
+      // Kill velocity towards the wall to prevent "sticking"
+      final wallNormal = (footPos - targetFootPos).normalized();
+      if (wallNormal.length2 > 0) {
+        final dot = body.linearVelocity.dot(wallNormal);
+        if (dot > 0) {
+          body.linearVelocity.sub(wallNormal * dot);
+        }
+      }
+
+      // On collision, change direction
+      if (math.Random().nextDouble() < 0.8) {
+        final errorVec = footPos - targetFootPos;
+        if (errorVec.x.abs() > 0.1) _walkDirection.x *= -1;
+        if (errorVec.y.abs() > 0.1) _walkDirection.y *= -1;
+      }
+    }
+
+    // Randomize direction slightly for more "alive" movement
     if (math.Random().nextDouble() < 0.02) {
       final jitterAngle = (math.Random().nextDouble() - 0.5) * 0.5;
       final currentAngle = math.atan2(_walkDirection.y, _walkDirection.x);
       final newAngle = currentAngle + jitterAngle;
       _walkDirection.setValues(math.cos(newAngle), math.sin(newAngle));
-    }
-
-    if (_walkDirection.length2 > 0) {
-      body.linearVelocity = _walkDirection.normalized() * _walkSpeed;
-    } else {
-      body.linearVelocity = Vector2.zero();
     }
   }
 
@@ -218,38 +238,87 @@ class Player extends BodyComponent {
     canvas.drawLine(rightShoulder, rightElbow, bodyPaint);
     canvas.drawLine(rightElbow, rightHand, bodyPaint);
 
-    // Legs (two segments each) with circular foot motion
-    final hipY = torsoBottom.dy;
-    final legLength = scaledRadius * 2.0;
+    // Legs (two segments each) with circular knee and foot motion
+    final hipLeft = Offset(
+      torsoBottom.dx - scaledRadius * 0.25,
+      torsoBottom.dy,
+    );
+    final hipRight = Offset(
+      torsoBottom.dx + scaledRadius * 0.25,
+      torsoBottom.dy,
+    );
 
-    final stepRadius = scaledRadius * 0.8;
-    final stepSpeed = 4.0; // radians per second
+    final kneeRadius = scaledRadius * 0.6;
+    final footRadius = scaledRadius * 0.9;
+    final stepSpeed = 4.0;
     final phase = autoWalk ? _time * stepSpeed : 0.0;
 
-    // Left leg
-    final leftHip = Offset(center.dx, hipY);
-    final leftKnee = leftHip + Offset(-legLength * 0.4, legLength * 0.8);
-    final leftFootBase = leftKnee + Offset(-legLength * 0.4, legLength * 0.7);
-    final leftFoot = Offset(
-      leftFootBase.dx + stepRadius * math.cos(phase),
-      leftFootBase.dy + stepRadius * math.sin(phase),
+    // Left leg (matches update() logic)
+    final leftKnee = Offset(
+      hipLeft.dx + kneeRadius * math.cos(phase),
+      hipLeft.dy + kneeRadius * math.sin(phase),
     );
-    canvas.drawLine(leftHip, leftKnee, bodyPaint);
+    final leftFoot = Offset(
+      leftKnee.dx + footRadius * math.cos(phase + math.pi / 2),
+      leftKnee.dy + footRadius * math.sin(phase + math.pi / 2),
+    );
+    canvas.drawLine(hipLeft, leftKnee, bodyPaint);
     canvas.drawLine(leftKnee, leftFoot, bodyPaint);
 
-    // Right leg (phase shifted so they alternate)
-    final rightHip = Offset(center.dx, hipY);
-    final rightKnee = rightHip + Offset(legLength * 0.4, legLength * 0.8);
-    final rightFootBase = rightKnee + Offset(legLength * 0.4, legLength * 0.7);
-    final rightFoot = Offset(
-      rightFootBase.dx + stepRadius * math.cos(phase + math.pi),
-      rightFootBase.dy + stepRadius * math.sin(phase + math.pi),
+    // Right leg (matches update() logic, phase shifted)
+    final rightKnee = Offset(
+      hipRight.dx + kneeRadius * math.cos(phase + math.pi),
+      hipRight.dy + kneeRadius * math.sin(phase + math.pi),
     );
-    canvas.drawLine(rightHip, rightKnee, bodyPaint);
+    final rightFoot = Offset(
+      rightKnee.dx + footRadius * math.cos(phase + 3 * math.pi / 2),
+      rightKnee.dy + footRadius * math.sin(phase + 3 * math.pi / 2),
+    );
+    canvas.drawLine(hipRight, rightKnee, bodyPaint);
     canvas.drawLine(rightKnee, rightFoot, bodyPaint);
   }
 
   void setWalkDirection(Vector2 dir) {
     _walkDirection = dir;
+  }
+
+  // Helper to compute foot position from head position, encapsulating the animation logic.
+  Vector2 _calculateFootPos(
+    Vector2 headPos,
+    double back,
+    double front,
+    double phase,
+  ) {
+    final t = ((headPos.y - back) / (front - back)).clamp(0.0, 1.0);
+    final scale = lerpDouble(1, 4, t)!;
+    final scaledRadius = _radius * scale;
+    final torsoBottomY = headPos.y + scaledRadius * 4;
+    final hipLeft = Vector2(headPos.x - scaledRadius * 0.25, torsoBottomY);
+    final hipRight = Vector2(headPos.x + scaledRadius * 0.25, torsoBottomY);
+
+    final kneeRadius = scaledRadius * 0.6;
+    final footRadius = scaledRadius * 0.9;
+
+    // Vänster knä och fot
+    final leftKnee = Vector2(
+      hipLeft.x + kneeRadius * math.cos(phase),
+      hipLeft.y + kneeRadius * math.sin(phase),
+    );
+    final leftFoot = Vector2(
+      leftKnee.x + footRadius * math.cos(phase + math.pi / 2),
+      leftKnee.y + footRadius * math.sin(phase + math.pi / 2),
+    );
+
+    // Höger knä och fot (fasförskjutet)
+    final rightKnee = Vector2(
+      hipRight.x + kneeRadius * math.cos(phase + math.pi),
+      hipRight.y + kneeRadius * math.sin(phase + math.pi),
+    );
+    final rightFoot = Vector2(
+      rightKnee.x + footRadius * math.cos(phase + 3 * math.pi / 2),
+      rightKnee.y + footRadius * math.sin(phase + 3 * math.pi / 2),
+    );
+
+    return (leftFoot.y > rightFoot.y) ? leftFoot : rightFoot;
   }
 }
