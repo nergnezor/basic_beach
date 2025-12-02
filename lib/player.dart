@@ -1,9 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:basic_beach/draw_court.dart';
-import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
-import 'package:flutter/foundation.dart';
 
 class Player extends BodyComponent {
   Player(
@@ -89,12 +87,12 @@ class Player extends BodyComponent {
     final front = layout.frontLineY;
     final yWorld = body.position.y;
     final t = ((yWorld - back) / (front - back)).clamp(0.0, 1.0);
-    final scale = lerpDouble(1, 4, t)!;
+    final scale = lerpDouble(0.5, 4, t)!;
 
     // Uppskatta fotposition i världens koordinater. Kroppen ritas från
     // huvud (center) nedåt ~5 * scaledRadius.
     final scaledRadius = _radius * scale;
-    final double footOffsetWorld = 8.0 * scaledRadius;
+    final double footOffsetWorld = 13.0 * scaledRadius;
     final headPos = body.position;
     final footPos = headPos + Vector2(0, footOffsetWorld);
 

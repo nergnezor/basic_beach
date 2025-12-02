@@ -1,9 +1,7 @@
-import 'dart:math' as math;
 import 'dart:ui';
 import 'package:basic_beach/draw_court.dart';
 import 'package:basic_beach/net.dart';
 import 'package:basic_beach/player.dart';
-import 'package:flutter/services.dart';
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
