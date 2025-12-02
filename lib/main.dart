@@ -102,9 +102,35 @@ class MouseJointWorld extends Forge2DWorld
         (layout.backLineY + layout.frontLineY) / 2 +
         (layout.frontLineY - layout.backLineY) / 4;
 
-    add(Player(Vector2(leftX, topY), playerId: 0));
+    // Bestäm gånggränser från court-bredden
+    final leftWalkLeft = -layout.widthBack / 2;
+    final leftWalkRight = 0.0;
+    final rightWalkLeft = 0.0;
+    final rightWalkRight = layout.widthBack / 2;
+
+    // Övre två spelare går automatiskt på sin planhalva
+    add(
+      Player(
+        Vector2(leftX, topY),
+        playerId: 0,
+        autoWalk: true,
+        walkLeftBoundary: leftWalkLeft,
+        walkRightBoundary: leftWalkRight,
+      ),
+    );
+
     add(Player(Vector2(leftX, bottomY), playerId: 1));
-    add(Player(Vector2(rightX, topY), playerId: 2));
+
+    add(
+      Player(
+        Vector2(rightX, topY),
+        playerId: 2,
+        autoWalk: true,
+        walkLeftBoundary: rightWalkLeft,
+        walkRightBoundary: rightWalkRight,
+      ),
+    );
+
     add(Player(Vector2(rightX, bottomY), playerId: 3));
 
     // game.add(Worm(Vector2(game.size.x / 2, 0)));
