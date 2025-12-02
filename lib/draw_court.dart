@@ -143,7 +143,7 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
 
 void drawNet(Canvas canvas, Rect canvasRect) {
   final layout = computeCourtLayout(canvasRect);
-  final paint = Paint()..color = const Color(0x7FFFFFFF);
+  final paint = Paint()..color = const Color(0x6FFFFFFF);
 
   final centerY = layout.centerLineY;
   final backLineY = layout.backLineY;

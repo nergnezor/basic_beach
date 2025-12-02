@@ -83,10 +83,18 @@ class Player extends BodyComponent {
       _walkDirection = Vector2(math.cos(angle), math.sin(angle));
     }
 
-    // Beräkna en uppskattad fotposition i världens koordinater.
-    // Kroppen ritas från huvud (center) nedåt ~5 * radius, så använd det
-    // som vertikal offset mellan head-center och fot.
-    const double footOffsetWorld = 5.0 * _radius;
+    // Beräkna skalan på samma sätt som i renderCircle, baserat på
+    // kroppens globala y mellan backLine och frontLine.
+    final back = layout.backLineY;
+    final front = layout.frontLineY;
+    final yWorld = body.position.y;
+    final t = ((yWorld - back) / (front - back)).clamp(0.0, 1.0);
+    final scale = lerpDouble(1, 4, t)!;
+
+    // Uppskatta fotposition i världens koordinater. Kroppen ritas från
+    // huvud (center) nedåt ~5 * scaledRadius.
+    final scaledRadius = _radius * scale;
+    final double footOffsetWorld = 8.0 * scaledRadius;
     final headPos = body.position;
     final footPos = headPos + Vector2(0, footOffsetWorld);
 
