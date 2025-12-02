@@ -24,7 +24,7 @@ class Player extends BodyComponent {
   static const double _radius = 1.0;
 
   Vector2 _walkDirection = Vector2(1, 0);
-  final _walkSpeed = 40.0; // units per second
+  final _walkSpeed = 25.0; // units per second
   double _time = 0.0; // for foot-circle animation of legs
 
   @override
@@ -82,26 +82,35 @@ class Player extends BodyComponent {
       _walkDirection = Vector2(math.cos(angle), math.sin(angle));
     }
 
-    var pos = body.position;
+    // Beräkna en uppskattad fotposition i världens koordinater.
+    // Kroppen ritas från huvud (center) nedåt ~5 * radius, så använd det
+    // som vertikal offset mellan head-center och fot.
+    const double footOffsetWorld = 5.0 * _radius;
+    final headPos = body.position;
+    final footPos = headPos + Vector2(0, footOffsetWorld);
 
-    // Kontrollera kollision med halvan och vänd/reflektera riktning
-    if (pos.x <= sideLeftLimit && _walkDirection.x < 0) {
+    var clampedFoot = footPos;
+
+    // Kontrollera kollision på fotnivå och vänd/reflektera riktning
+    if (clampedFoot.x <= sideLeftLimit && _walkDirection.x < 0) {
       _walkDirection.x = -_walkDirection.x;
-      pos.x = sideLeftLimit;
-    } else if (pos.x >= sideRightLimit && _walkDirection.x > 0) {
+      clampedFoot.x = sideLeftLimit;
+    } else if (clampedFoot.x >= sideRightLimit && _walkDirection.x > 0) {
       _walkDirection.x = -_walkDirection.x;
-      pos.x = sideRightLimit;
+      clampedFoot.x = sideRightLimit;
     }
 
-    if (pos.y <= rowTopLimit && _walkDirection.y < 0) {
+    if (clampedFoot.y <= rowTopLimit && _walkDirection.y < 0) {
       _walkDirection.y = -_walkDirection.y;
-      pos.y = rowTopLimit;
-    } else if (pos.y >= rowBottomLimit && _walkDirection.y > 0) {
+      clampedFoot.y = rowTopLimit;
+    } else if (clampedFoot.y >= rowBottomLimit && _walkDirection.y > 0) {
       _walkDirection.y = -_walkDirection.y;
-      pos.y = rowBottomLimit;
+      clampedFoot.y = rowBottomLimit;
     }
 
-    body.setTransform(pos, body.angle);
+    // Flytta tillbaka huvudets center från den klampade fotpositionen
+    final newHeadPos = clampedFoot - Vector2(0, footOffsetWorld);
+    body.setTransform(newHeadPos, body.angle);
 
     // Ibland randomisera riktning lite för mer “levande” rörelse
     if (isTopRow) {
