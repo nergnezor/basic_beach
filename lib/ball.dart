@@ -56,6 +56,17 @@ class BouncingBall extends BodyComponent {
       ..color = const Color(0xFF1C1C1C)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
-    canvas.drawCircle(center, radius * 0.9, seamPaint);
+    canvas.drawCircle(center, radius, seamPaint);
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+    // Limit maximum velocity to avoid tunneling through the floor
+    final velocity = body.linearVelocity;
+    final maxVelocity = 20.0;
+    if (velocity.length > maxVelocity) {
+      body.linearVelocity = velocity.normalized() * maxVelocity;
+    }
   }
 }
