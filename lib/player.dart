@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:basic_beach/draw_court.dart';
 import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 
@@ -10,7 +11,9 @@ class Player extends BodyComponent {
     this.autoWalk = false,
     required this.isLeftSide,
     required this.isTopRow,
-  });
+  }) {
+    priority = isTopRow ? 5 : 15; // top drawn before bottom
+  }
 
   final Vector2 spawnPosition;
   final int playerId;
@@ -21,8 +24,8 @@ class Player extends BodyComponent {
   static const double _radius = 1.0;
 
   Vector2 _walkDirection = Vector2(1, 0);
-  final _walkSpeed = 4.0; // units per second
-  double _time = 0.0; // for foot-circle animation
+  final _walkSpeed = 40.0; // units per second
+  double _time = 0.0; // for foot-circle animation of legs
 
   @override
   Body createBody() {
@@ -54,23 +57,24 @@ class Player extends BodyComponent {
     // Hämta court-rektangel i världens koordinater
     final rect = game.camera.visibleWorldRect;
 
-    // Horisontella gränser för hela court
-    final leftLimit = rect.center.dx - (rect.width / 2);
-    final rightLimit = rect.center.dx + (rect.width / 2);
-    final centerX = rect.center.dx;
+    final layout = computeCourtLayout(rect);
+    final poly = isTopRow ? layout.topPolygon : layout.bottomPolygon;
 
-    // Vertikala gränser – använd en del av höjden
-    final topLimit = rect.center.dy - (rect.height / 2);
-    final bottomLimit = rect.center.dy + (rect.height / 2);
+    // Compute AABB of polygon
+    double minX = poly.first.dx, maxX = poly.first.dx;
+    double minY = poly.first.dy, maxY = poly.first.dy;
+    for (final o in poly) {
+      if (o.dx < minX) minX = o.dx;
+      if (o.dx > maxX) maxX = o.dx;
+      if (o.dy < minY) minY = o.dy;
+      if (o.dy > maxY) maxY = o.dy;
+    }
 
-    // Bestäm denna spelares halva
-    final sideLeftLimit = isLeftSide ? leftLimit : centerX;
-    final sideRightLimit = isLeftSide ? centerX : rightLimit;
-
-    // Övre rad får röra sig i övre halvan, nedre i nedre halvan
-    final verticalMid = (topLimit + bottomLimit) / 2;
-    final rowTopLimit = isTopRow ? topLimit : verticalMid;
-    final rowBottomLimit = isTopRow ? verticalMid : bottomLimit;
+    // Use this AABB instead of earlier side/row limits
+    final sideLeftLimit = minX;
+    final sideRightLimit = maxX;
+    final rowTopLimit = minY;
+    final rowBottomLimit = maxY;
 
     // Initiera slumpmässig riktning ibland
     if (_walkDirection.length2 == 0) {
@@ -123,7 +127,7 @@ class Player extends BodyComponent {
   void renderCircle(Canvas canvas, Offset center, double radius) {
     final headPaint = Paint()..color = const Color(0xFF0000FF);
     final bodyPaint = Paint()
-      ..color = const Color(0xFFFFFFFF)
+      ..color = const Color.fromARGB(255, 48, 111, 136)
       ..strokeWidth = radius * 0.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -165,7 +169,6 @@ class Player extends BodyComponent {
     // Left leg
     final leftHip = Offset(center.dx, hipY);
     final leftKnee = leftHip + Offset(-legLength * 0.4, legLength * 0.8);
-    // Circle motion for foot: offset around a small circle
     final leftFootBase = leftKnee + Offset(-legLength * 0.4, legLength * 0.7);
     final leftFoot = Offset(
       leftFootBase.dx + stepRadius * math.cos(phase),
@@ -186,7 +189,6 @@ class Player extends BodyComponent {
     canvas.drawLine(rightKnee, rightFoot, bodyPaint);
   }
 
-  // I Player
   void setWalkDirection(Vector2 dir) {
     _walkDirection = dir;
   }

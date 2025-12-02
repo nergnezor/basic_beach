@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:basic_beach/draw_court.dart';
+import 'package:basic_beach/net.dart';
 import 'package:basic_beach/player.dart';
 import 'package:flutter/services.dart';
 
@@ -110,26 +111,25 @@ class MouseJointWorld extends Forge2DWorld
         isTopRow: true,
       ),
     );
+    // Övre höger – auto, höger sida
+    add(
+      Player(
+        Vector2(rightX, topY),
+        playerId: 1,
+        autoWalk: true,
+        isLeftSide: false,
+        isTopRow: true,
+      ),
+    );
 
     // Nedre vänster – stilla
     add(
       Player(
         Vector2(leftX, bottomY),
-        playerId: 1,
+        playerId: 2,
         autoWalk: false,
         isLeftSide: true,
         isTopRow: false,
-      ),
-    );
-
-    // Övre höger – auto, höger sida
-    add(
-      Player(
-        Vector2(rightX, topY),
-        playerId: 2,
-        autoWalk: true,
-        isLeftSide: false,
-        isTopRow: true,
       ),
     );
 
@@ -143,16 +143,17 @@ class MouseJointWorld extends Forge2DWorld
         isTopRow: false,
       ),
     );
+    add(Net());
 
-    // game.add(Worm(Vector2(game.size.x / 2, 0)));
     super.onLoad();
   }
 
   @override
   void render(Canvas canvas) {
-    // Draw background gradient
     final fragment = shader;
     final canvasRect = game.camera.visibleWorldRect;
+
+    // background...
     if (fragment != null) {
       fragment
         ..setFloat(0, time)
@@ -163,9 +164,14 @@ class MouseJointWorld extends Forge2DWorld
       canvas.drawRect(canvasRect, Paint()..color = const Color(0xFF0A1E32));
     }
 
+    // Court ground and lines
     drawCourt(canvas, canvasRect);
 
+    // Players (top & bottom)
     super.render(canvas);
+
+    // Net drawn on top
+    drawNet(canvas, canvasRect);
   }
 
   @override

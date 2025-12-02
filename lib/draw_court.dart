@@ -8,6 +8,8 @@ class CourtLayout {
   final double widthCenter;
   final double widthBack;
   final double widthFront;
+  final List<Offset> topPolygon;
+  final List<Offset> bottomPolygon;
 
   const CourtLayout({
     required this.centerLineY,
@@ -16,6 +18,8 @@ class CourtLayout {
     required this.widthCenter,
     required this.widthBack,
     required this.widthFront,
+    required this.topPolygon,
+    required this.bottomPolygon,
   });
 }
 
@@ -38,6 +42,26 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
       (halfCenterWidth / courtWidthFront) * (frontLineY - backLineY);
   final centerLineY = backLineY + halfCenterY - bottomPadding;
 
+  // Court-halvor som polygoner (vänster/höger)
+  final leftBackX = -courtWidthBack / 2;
+  final rightBackX = courtWidthBack / 2;
+  final leftFrontX = -courtWidthFront / 2;
+  final rightFrontX = courtWidthFront / 2;
+
+  final topPoly = <Offset>[
+    Offset(leftBackX, backLineY),
+    Offset(rightBackX, backLineY),
+    Offset(courtWidthCenter / 2, centerLineY),
+    Offset(-courtWidthCenter / 2, centerLineY),
+  ];
+
+  final bottomPoly = <Offset>[
+    Offset(-courtWidthCenter / 2, centerLineY),
+    Offset(courtWidthCenter / 2, centerLineY),
+    Offset(rightFrontX, frontLineY),
+    Offset(leftFrontX, frontLineY),
+  ];
+
   return CourtLayout(
     centerLineY: centerLineY,
     backLineY: backLineY,
@@ -45,6 +69,8 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
     widthCenter: courtWidthCenter,
     widthBack: courtWidthBack,
     widthFront: courtWidthFront,
+    topPolygon: topPoly,
+    bottomPolygon: bottomPoly,
   );
 }
 
@@ -60,21 +86,21 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
   final courtWidthBack = layout.widthBack;
   final courtWidthFront = layout.widthFront;
 
-  // Draw back line
+  // Back line
   canvas.drawLine(
     Offset(-courtWidthBack / 2, backLineY),
     Offset(courtWidthBack / 2, backLineY),
     paint..strokeWidth = 0.5,
   );
 
-  // Draw front line
+  // Front line
   canvas.drawLine(
     Offset(-courtWidthFront / 2, frontLineY),
     Offset(courtWidthFront / 2, frontLineY),
     paint..strokeWidth = 2,
   );
 
-  // Draw middle line
+  // Middle line (no net here anymore)
   final middleY = layout.centerLineY;
   canvas.drawLine(
     Offset(-layout.widthCenter / 2, middleY),
@@ -82,31 +108,48 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
     paint..strokeWidth = 0.5,
   );
 
-  // Draw net as a rectangle
-  final netHeight = (frontLineY - backLineY) * 0.2;
-  final netWidth = layout.widthCenter;
-  final netRect = Rect.fromCenter(
-    center: Offset(0, middleY - netHeight / 2),
-    width: netWidth,
-    height: netHeight,
-  );
-  canvas.drawRect(
-    netRect,
-    paint
-      ..style = PaintingStyle.fill
-      ..color = const Color(0xFF808080).withAlpha(50),
-  );
+  // Court polygon
+  final leftPath = Path()..addPolygon(layout.topPolygon, true);
+  final rightPath = Path()..addPolygon(layout.bottomPolygon, true);
 
-  final courtPoly = Path()
-    ..moveTo(-courtWidthBack / 2, backLineY)
-    ..lineTo(courtWidthBack / 2, backLineY)
-    ..lineTo(courtWidthFront / 2, frontLineY)
-    ..lineTo(-courtWidthFront / 2, frontLineY)
-    ..close();
   canvas.drawPath(
-    courtPoly,
+    leftPath,
     paint
       ..style = PaintingStyle.fill
       ..color = const Color(0xFF228B22).withAlpha(50),
+  );
+
+  canvas.drawPath(
+    rightPath,
+    paint
+      ..style = PaintingStyle.fill
+      ..color = const Color.fromARGB(255, 202, 161, 57).withAlpha(150),
+  );
+}
+
+void drawNet(Canvas canvas, Rect canvasRect) {
+  final layout = computeCourtLayout(canvasRect);
+  final paint = Paint()..color = const Color(0x7FFFFFFF);
+
+  final centerY = layout.centerLineY;
+  final backLineY = layout.backLineY;
+  final frontLineY = layout.frontLineY;
+
+  // Net positioned where left and right halves meet
+  final netHeight = (frontLineY - backLineY) * 0.2;
+  final netWidth = layout.widthCenter;
+  final netRect = Rect.fromCenter(
+    center: Offset(0, centerY - netHeight / 2),
+    width: netWidth,
+    height: netHeight,
+  );
+  final rrect = RRect.fromRectAndRadius(netRect, const Radius.circular(0.5));
+  canvas.drawRRect(rrect, paint);
+  canvas.drawRRect(
+    rrect,
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.2
+      ..color = const Color(0x1fffffFF).withAlpha(100),
   );
 }
