@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 
 class Player extends BodyComponent {
@@ -7,22 +8,19 @@ class Player extends BodyComponent {
     this.spawnPosition, {
     required this.playerId,
     this.autoWalk = false,
-    this.walkLeftBoundary,
-    this.walkRightBoundary,
+    required this.isLeftSide,
+    required this.isTopRow,
   });
 
   final Vector2 spawnPosition;
   final int playerId;
-
-  // If true, this player will automatically walk horizontally
-  // between [walkLeftBoundary] and [walkRightBoundary].
   final bool autoWalk;
-  final double? walkLeftBoundary;
-  final double? walkRightBoundary;
+  final bool isLeftSide;
+  final bool isTopRow;
 
   static const double _radius = 1.0;
 
-  double _walkDirection = 1.0; // 1: right, -1: left
+  Vector2 _walkDirection = Vector2(1, 0);
   final _walkSpeed = 4.0; // units per second
   double _time = 0.0; // for foot-circle animation
 
@@ -48,16 +46,76 @@ class Player extends BodyComponent {
 
     _time += dt;
 
-    if (autoWalk) {
-      final pos = body.position;
+    if (!autoWalk) {
+      body.linearVelocity = Vector2.zero();
+      return;
+    }
 
-      if (walkLeftBoundary != null && pos.x <= walkLeftBoundary!) {
-        _walkDirection = 1.0;
-      } else if (walkRightBoundary != null && pos.x >= walkRightBoundary!) {
-        _walkDirection = -1.0;
+    // Hämta court-rektangel i världens koordinater
+    final rect = game.camera.visibleWorldRect;
+
+    // Horisontella gränser för hela court
+    final leftLimit = rect.center.dx - (rect.width / 2);
+    final rightLimit = rect.center.dx + (rect.width / 2);
+    final centerX = rect.center.dx;
+
+    // Vertikala gränser – använd en del av höjden
+    final topLimit = rect.center.dy - (rect.height / 2);
+    final bottomLimit = rect.center.dy + (rect.height / 2);
+
+    // Bestäm denna spelares halva
+    final sideLeftLimit = isLeftSide ? leftLimit : centerX;
+    final sideRightLimit = isLeftSide ? centerX : rightLimit;
+
+    // Övre rad får röra sig i övre halvan, nedre i nedre halvan
+    final verticalMid = (topLimit + bottomLimit) / 2;
+    final rowTopLimit = isTopRow ? topLimit : verticalMid;
+    final rowBottomLimit = isTopRow ? verticalMid : bottomLimit;
+
+    // Initiera slumpmässig riktning ibland
+    if (_walkDirection.length2 == 0) {
+      final angle = math.Random().nextDouble() * 2 * math.pi;
+      _walkDirection = Vector2(math.cos(angle), math.sin(angle));
+    }
+
+    var pos = body.position;
+
+    // Kontrollera kollision med halvan och vänd/reflektera riktning
+    if (pos.x <= sideLeftLimit && _walkDirection.x < 0) {
+      _walkDirection.x = -_walkDirection.x;
+      pos.x = sideLeftLimit;
+    } else if (pos.x >= sideRightLimit && _walkDirection.x > 0) {
+      _walkDirection.x = -_walkDirection.x;
+      pos.x = sideRightLimit;
+    }
+
+    if (pos.y <= rowTopLimit && _walkDirection.y < 0) {
+      _walkDirection.y = -_walkDirection.y;
+      pos.y = rowTopLimit;
+    } else if (pos.y >= rowBottomLimit && _walkDirection.y > 0) {
+      _walkDirection.y = -_walkDirection.y;
+      pos.y = rowBottomLimit;
+    }
+
+    body.setTransform(pos, body.angle);
+
+    // Ibland randomisera riktning lite för mer “levande” rörelse
+    if (isTopRow) {
+      if (math.Random().nextDouble() < 0.02) {
+        final jitterAngle = (math.Random().nextDouble() - 0.5) * 0.5;
+        final currentAngle = math.atan2(_walkDirection.y, _walkDirection.x);
+        final newAngle = currentAngle + jitterAngle;
+        _walkDirection.setValues(math.cos(newAngle), math.sin(newAngle));
       }
+    } else {
+      // Nedre rad kan stå still eller gå bara lite
+      _walkDirection.setValues(0, 0);
+    }
 
-      body.linearVelocity = Vector2(_walkDirection * _walkSpeed, 0);
+    if (_walkDirection.length2 > 0) {
+      body.linearVelocity = _walkDirection.normalized() * _walkSpeed;
+    } else {
+      body.linearVelocity = Vector2.zero();
     }
   }
 
@@ -126,5 +184,10 @@ class Player extends BodyComponent {
     );
     canvas.drawLine(rightHip, rightKnee, bodyPaint);
     canvas.drawLine(rightKnee, rightFoot, bodyPaint);
+  }
+
+  // I Player
+  void setWalkDirection(Vector2 dir) {
+    _walkDirection = dir;
   }
 }

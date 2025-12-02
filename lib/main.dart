@@ -86,8 +86,6 @@ class MouseJointWorld extends Forge2DWorld
       playingMusic = true;
     }
 
-    // Add boundaries and sand floor
-    add(SandFloor(height: 5.8));
     add(BouncingBall(Vector2(0, -4)));
     // Place the four players on the court
     final canvasRect = game.camera.visibleWorldRect;
@@ -102,36 +100,49 @@ class MouseJointWorld extends Forge2DWorld
         (layout.backLineY + layout.frontLineY) / 2 +
         (layout.frontLineY - layout.backLineY) / 4;
 
-    // Bestäm gånggränser från court-bredden
-    final leftWalkLeft = -layout.widthBack / 2;
-    final leftWalkRight = 0.0;
-    final rightWalkLeft = 0.0;
-    final rightWalkRight = layout.widthBack / 2;
-
-    // Övre två spelare går automatiskt på sin planhalva
+    // Övre vänster – auto, vänster sida
     add(
       Player(
         Vector2(leftX, topY),
         playerId: 0,
         autoWalk: true,
-        walkLeftBoundary: leftWalkLeft,
-        walkRightBoundary: leftWalkRight,
+        isLeftSide: true,
+        isTopRow: true,
       ),
     );
 
-    add(Player(Vector2(leftX, bottomY), playerId: 1));
+    // Nedre vänster – stilla
+    add(
+      Player(
+        Vector2(leftX, bottomY),
+        playerId: 1,
+        autoWalk: false,
+        isLeftSide: true,
+        isTopRow: false,
+      ),
+    );
 
+    // Övre höger – auto, höger sida
     add(
       Player(
         Vector2(rightX, topY),
         playerId: 2,
         autoWalk: true,
-        walkLeftBoundary: rightWalkLeft,
-        walkRightBoundary: rightWalkRight,
+        isLeftSide: false,
+        isTopRow: true,
       ),
     );
 
-    add(Player(Vector2(rightX, bottomY), playerId: 3));
+    // Nedre höger – stilla
+    add(
+      Player(
+        Vector2(rightX, bottomY),
+        playerId: 3,
+        autoWalk: false,
+        isLeftSide: false,
+        isTopRow: false,
+      ),
+    );
 
     // game.add(Worm(Vector2(game.size.x / 2, 0)));
     super.onLoad();
@@ -159,7 +170,7 @@ class MouseJointWorld extends Forge2DWorld
 
   @override
   void update(double dt) {
-    time += dt;
     super.update(dt);
+    time += dt;
   }
 }

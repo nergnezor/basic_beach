@@ -1,26 +1,6 @@
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/painting.dart';
 
-class SandFloor extends BodyComponent {
-  SandFloor({this.width = 30, this.height = 6});
-
-  final double width;
-  final double height;
-
-  @override
-  Body createBody() {
-    final shape = EdgeShape()
-      ..set(Vector2(-width, height), Vector2(width, height));
-    final fixtureDef = FixtureDef(shape)
-      ..restitution = 0.0
-      ..friction = 0.9;
-    final bodyDef = BodyDef()
-      ..position = Vector2.zero()
-      ..userData = this;
-    return world.createBody(bodyDef)..createFixture(fixtureDef);
-  }
-}
-
 class BouncingBall extends BodyComponent {
   BouncingBall(this.spawnPosition);
 

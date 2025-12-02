@@ -2,14 +2,18 @@ import 'dart:math';
 import 'dart:ui';
 
 class CourtLayout {
+  final double centerLineY;
   final double backLineY;
   final double frontLineY;
+  final double widthCenter;
   final double widthBack;
   final double widthFront;
 
   const CourtLayout({
+    required this.centerLineY,
     required this.backLineY,
     required this.frontLineY,
+    required this.widthCenter,
     required this.widthBack,
     required this.widthFront,
   });
@@ -29,8 +33,10 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
   final frontLineY = yBottom;
 
   return CourtLayout(
+    centerLineY: (backLineY + frontLineY) / 2,
     backLineY: backLineY,
     frontLineY: frontLineY,
+    widthCenter: courtWidthCenter,
     widthBack: courtWidthBack,
     widthFront: courtWidthFront,
   );
@@ -60,6 +66,29 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
     Offset(-courtWidthFront / 2, frontLineY),
     Offset(courtWidthFront / 2, frontLineY),
     paint..strokeWidth = 2,
+  );
+
+  // Draw middle line
+  final middleY = layout.centerLineY;
+  canvas.drawLine(
+    Offset(-layout.widthCenter / 2, middleY),
+    Offset(layout.widthCenter / 2, middleY),
+    paint..strokeWidth = 0.5,
+  );
+
+  // Draw net as a rectangle
+  final netHeight = (frontLineY - backLineY) * 0.1;
+  final netWidth = layout.widthCenter;
+  final netRect = Rect.fromCenter(
+    center: Offset(0, middleY),
+    width: netWidth,
+    height: netHeight,
+  );
+  canvas.drawRect(
+    netRect,
+    paint
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF808080).withAlpha(150),
   );
 
   final courtPoly = Path()
