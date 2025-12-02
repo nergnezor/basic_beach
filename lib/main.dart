@@ -138,7 +138,7 @@ class MouseJointWorld extends Forge2DWorld
       Player(
         Vector2(rightX, bottomY),
         playerId: 3,
-        autoWalk: false,
+        autoWalk: true,
         isLeftSide: false,
         isTopRow: false,
       ),

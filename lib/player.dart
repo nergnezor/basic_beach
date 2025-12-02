@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:basic_beach/draw_court.dart';
 import 'package:flame/components.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
+import 'package:flutter/foundation.dart';
 
 class Player extends BodyComponent {
   Player(
@@ -134,24 +135,43 @@ class Player extends BodyComponent {
 
   @override
   void renderCircle(Canvas canvas, Offset center, double radius) {
+    // Skala spelaren efter y-position i världens koordinater.
+    // // CourtLayout räknar automatiskt ut djupfaktorer utifrån
+    // // bak-/framlinje och nät.
+    final worldRect = game.camera.visibleWorldRect;
+    final layout = computeCourtLayout(worldRect);
+
+    final back = layout.backLineY;
+    final front = layout.frontLineY;
+
+    // Projektera spelarens y på segmentet [back, front]
+    final yWorld = body.position.y;
+    final t = ((yWorld - back) / (front - back)).clamp(
+      0.0,
+      1.0,
+    ); // 0 vid back, 1 vid front
+
+    final scale = lerpDouble(1, 4, t)!; // exempel
+    final scaledRadius = radius * scale;
+
     final headPaint = Paint()..color = const Color(0xFF0000FF);
     final bodyPaint = Paint()
       ..color = const Color.fromARGB(255, 48, 111, 136)
-      ..strokeWidth = radius * 0.5
+      ..strokeWidth = scaledRadius * 0.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
     // Head
-    canvas.drawCircle(center, radius, headPaint);
+    canvas.drawCircle(center, scaledRadius, headPaint);
 
     // Torso
-    final torsoTop = Offset(center.dx, center.dy + radius);
-    final torsoBottom = Offset(center.dx, center.dy + radius * 4);
+    final torsoTop = Offset(center.dx, center.dy + scaledRadius);
+    final torsoBottom = Offset(center.dx, center.dy + scaledRadius * 4);
     canvas.drawLine(torsoTop, torsoBottom, bodyPaint);
 
     // Arms (two segments each)
-    final shoulderY = center.dy + radius * 1.5;
-    final armLength = radius * 1.8;
+    final shoulderY = center.dy + scaledRadius * 1.5;
+    final armLength = scaledRadius * 1.8;
 
     // Left arm
     final leftShoulder = Offset(center.dx, shoulderY);
@@ -169,9 +189,9 @@ class Player extends BodyComponent {
 
     // Legs (two segments each) with circular foot motion
     final hipY = torsoBottom.dy;
-    final legLength = radius * 2.0;
+    final legLength = scaledRadius * 2.0;
 
-    final stepRadius = radius * 0.8;
+    final stepRadius = scaledRadius * 0.8;
     final stepSpeed = 4.0; // radians per second
     final phase = autoWalk ? _time * stepSpeed : 0.0;
 

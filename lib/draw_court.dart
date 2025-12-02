@@ -5,11 +5,16 @@ class CourtLayout {
   final double centerLineY;
   final double backLineY;
   final double frontLineY;
+  // Relativ djupfaktor 0..1 från "kamera"/front mot back,
+  // används för automatisk perspektivskala.
+  final double depthFactorTop;
+  final double depthFactorBottom;
   final double widthCenter;
   final double widthBack;
   final double widthFront;
   final List<Offset> topPolygon;
   final List<Offset> bottomPolygon;
+  static const double frontToBackScaleFactor = 4;
 
   const CourtLayout({
     required this.centerLineY,
@@ -20,12 +25,14 @@ class CourtLayout {
     required this.widthFront,
     required this.topPolygon,
     required this.bottomPolygon,
+    required this.depthFactorTop,
+    required this.depthFactorBottom,
   });
 }
 
 CourtLayout computeCourtLayout(Rect canvasRect) {
   final courtWidthCenter = canvasRect.width * 0.4;
-  final edgeToCenterWidthFactor = 2;
+  final edgeToCenterWidthFactor = CourtLayout.frontToBackScaleFactor / 2;
   final courtWidthFront = courtWidthCenter * edgeToCenterWidthFactor;
   final courtWidthBack = courtWidthCenter / edgeToCenterWidthFactor;
 
@@ -62,6 +69,11 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
     Offset(leftFrontX, frontLineY),
   ];
 
+  // Automatisk djupfaktor baserat på court-höjd: 0 vid nätet,
+  // 1 vid bak-/framlinje.
+  final topDepth = (centerLineY - backLineY).abs() / courtHeight;
+  final bottomDepth = (frontLineY - centerLineY).abs() / courtHeight;
+
   return CourtLayout(
     centerLineY: centerLineY,
     backLineY: backLineY,
@@ -71,6 +83,8 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
     widthFront: courtWidthFront,
     topPolygon: topPoly,
     bottomPolygon: bottomPoly,
+    depthFactorTop: topDepth.clamp(0.0, 1.0),
+    depthFactorBottom: bottomDepth.clamp(0.0, 1.0),
   );
 }
 
