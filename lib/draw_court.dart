@@ -32,8 +32,14 @@ CourtLayout computeCourtLayout(Rect canvasRect) {
   final backLineY = yBottom - courtHeight;
   final frontLineY = yBottom;
 
+  // Använd likformighet
+  final halfCenterWidth = courtWidthCenter;
+  final halfCenterY =
+      (halfCenterWidth / courtWidthFront) * (frontLineY - backLineY);
+  final centerLineY = backLineY + halfCenterY - bottomPadding;
+
   return CourtLayout(
-    centerLineY: (backLineY + frontLineY) / 2,
+    centerLineY: centerLineY,
     backLineY: backLineY,
     frontLineY: frontLineY,
     widthCenter: courtWidthCenter,
@@ -77,10 +83,10 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
   );
 
   // Draw net as a rectangle
-  final netHeight = (frontLineY - backLineY) * 0.1;
+  final netHeight = (frontLineY - backLineY) * 0.2;
   final netWidth = layout.widthCenter;
   final netRect = Rect.fromCenter(
-    center: Offset(0, middleY),
+    center: Offset(0, middleY - netHeight / 2),
     width: netWidth,
     height: netHeight,
   );
@@ -88,7 +94,7 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
     netRect,
     paint
       ..style = PaintingStyle.fill
-      ..color = const Color(0xFF808080).withAlpha(150),
+      ..color = const Color(0xFF808080).withAlpha(50),
   );
 
   final courtPoly = Path()
