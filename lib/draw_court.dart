@@ -101,32 +101,6 @@ void drawCourt(Canvas canvas, Rect canvasRect) {
     ..strokeWidth = 1.0;
 
   final layout = computeCourtLayout(canvasRect);
-  final backLineY = layout.backLineY;
-  final frontLineY = layout.frontLineY;
-  final courtWidthBack = layout.widthBack;
-  final courtWidthFront = layout.widthFront;
-
-  // Back line
-  canvas.drawLine(
-    Offset(-courtWidthBack / 2, backLineY),
-    Offset(courtWidthBack / 2, backLineY),
-    paint..strokeWidth = 0.5,
-  );
-
-  // Front line
-  canvas.drawLine(
-    Offset(-courtWidthFront / 2, frontLineY),
-    Offset(courtWidthFront / 2, frontLineY),
-    paint..strokeWidth = 2,
-  );
-
-  // Middle line (no net here anymore)
-  final middleY = layout.centerLineY;
-  canvas.drawLine(
-    Offset(-layout.widthCenter / 2, middleY),
-    Offset(layout.widthCenter / 2, middleY),
-    paint..strokeWidth = 0.5,
-  );
 
   // Court polygon
   final leftPath = Path()..addPolygon(layout.topPolygon, true);
