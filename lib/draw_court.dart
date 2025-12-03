@@ -16,6 +16,12 @@ class CourtLayout {
   final List<Offset> bottomPolygon;
   static const double frontToBackScaleFactor = 4;
 
+  /// Height of the net in world units (relative to court height).
+  double get netHeight => (frontLineY - backLineY) * 0.2;
+
+  /// Y coordinate of the top of the net.
+  double get netTopY => centerLineY - netHeight;
+
   const CourtLayout({
     required this.centerLineY,
     required this.backLineY,

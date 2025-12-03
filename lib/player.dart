@@ -21,14 +21,37 @@ class Player extends BodyComponent {
   final bool isLeftSide;
   final bool isTopRow;
 
-  static const double _radius = 1.0;
+  // Default unscaled radius; actual radius is decided at body creation
+  // based on the current net height so it can reach the net top.
+  double _radius = 1.0;
 
   Vector2 _walkDirection = Vector2(1, 0);
-  final double _walkSpeed = 25.0;
+  final double _walkSpeed = 15.0;
   double _time = 0.0;
 
   @override
   Body createBody() {
+    // Decide radius based on current court/net dimensions so player
+    // height at the net allows reaching the net top with a raised hand.
+    final rect = game.camera.visibleWorldRect;
+    final layout = computeCourtLayout(rect);
+
+    // At the net, we want the head top to be at 4/5 of net height.
+    // Net top is at: centerLineY - netHeight
+    // Head rendering: center is body position, head extends sr above and below
+    // So head top is at: body.y - sr (when scaled)
+    // At centerLineY with scale applied, we want:
+    //   centerLineY - sr*scale = netTopY + (4/5)*netHeight
+    //   centerLineY - sr*scale = centerLineY - netHeight + 0.8*netHeight
+    //   -sr*scale = -0.2*netHeight
+    //   sr*scale = 0.2*netHeight
+    // At the net (front line), scale ≈ frontScale (4.0 by default)
+    // So: radius * 4.0 = 0.2 * netHeight
+    //     radius = 0.05 * netHeight
+    final desiredRadius = layout.netHeight * 0.07;
+    // _radius = desiredRadius.clamp(0.4, 3.0);
+    _radius = desiredRadius;
+
     final s = CircleShape()..radius = _radius;
     final f = FixtureDef(s)
       ..density = 1.0
