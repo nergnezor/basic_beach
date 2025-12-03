@@ -61,8 +61,17 @@ class Player extends BodyComponent {
       _walkDirection.setValues(math.cos(a), math.sin(a));
     }
 
+    // scale movement by depth to match visual size
+    final y = body.position.y;
+    final tDepth =
+        ((y - layout.backLineY) / (layout.frontLineY - layout.backLineY)).clamp(
+          0.0,
+          1.0,
+        );
+    final depthScale = lerpDouble(1, 4, tDepth)!;
+    final moveSpeed = _walkSpeed * depthScale;
     body.linearVelocity = (_walkDirection.length2 > 0)
-        ? _walkDirection.normalized() * _walkSpeed
+        ? _walkDirection.normalized() * moveSpeed
         : Vector2.zero();
 
     final head = body.position.clone();
