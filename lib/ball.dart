@@ -1,4 +1,5 @@
 import 'package:basic_beach/draw_court.dart';
+import 'package:basic_beach/math_utils.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 import 'package:flutter/painting.dart';
 
@@ -27,30 +28,16 @@ class BouncingBall extends BodyComponent {
 
   @override
   void renderCircle(Canvas canvas, Offset center, double radius) {
-    // Skala bollen efter y-position med CourtLayouts djupfaktorer,
-    // så att skalan härleds automatiskt från court-geometrin.
+    // Skala bollen med samma perspektiv-konverterare som spelare m.m.
     final worldRect = game.camera.visibleWorldRect;
     final layout = computeCourtLayout(worldRect);
+    final perspective = CourtPerspectiveConverter(
+      layout,
+      backScale: 1.0,
+      frontScale: 0.6,
+    );
 
-    final y = center.dy;
-    final middleY = layout.centerLineY;
-
-    double depth;
-    if (y <= middleY) {
-      final denom = (middleY - layout.backLineY).abs();
-      final localT = denom > 0 ? (middleY - y).abs() / denom : 0.0;
-      depth = layout.depthFactorTop * localT;
-    } else {
-      final denom = (layout.frontLineY - middleY).abs();
-      final localT = denom > 0 ? (y - middleY).abs() / denom : 0.0;
-      depth = layout.depthFactorBottom * localT;
-    }
-
-    const double baseScale = 1.0;
-    const double depthScaleSpan = 0.4;
-    final scale = baseScale - depthScaleSpan * depth;
-
-    final scaledRadius = radius * scale;
+    final scaledRadius = radius * perspective.scaleAtY(center.dy);
 
     final gradient = RadialGradient(
       colors: const [Color(0xFFFFF5C3), Color(0xFFD17833)],

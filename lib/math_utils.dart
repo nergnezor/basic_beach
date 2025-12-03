@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:basic_beach/draw_court.dart';
+
 /// A 3D vector with basic math operations for perspective projection.
 class Vec3 {
   final double x;
@@ -18,10 +20,10 @@ class Vec3 {
   double dot(Vec3 other) => x * other.x + y * other.y + z * other.z;
 
   Vec3 cross(Vec3 other) => Vec3(
-        y * other.z - z * other.y,
-        z * other.x - x * other.z,
-        x * other.y - y * other.x,
-      );
+    y * other.z - z * other.y,
+    z * other.x - x * other.z,
+    x * other.y - y * other.x,
+  );
 
   double get length => math.sqrt(dot(this));
 
@@ -34,41 +36,43 @@ class Vec3 {
   }
 }
 
-/// Projects 3D points to 2D screen coordinates using perspective projection.
-class PerspectiveProjector {
-  /// Creates a perspective projector with camera position, target, and focal length.
-  ///
-  /// The [camera] is the eye position in world space.
-  /// The [target] is where the camera is looking at.
-  /// The [upHint] provides the "up" direction for the camera.
-  /// The [focalLength] controls the zoom level (smaller = more zoomed out).
-  PerspectiveProjector({
-    required this.camera,
-    required Vec3 target,
-    required Vec3 upHint,
-    this.focalLength = 1,
-  }) {
-    final view = (target - camera).normalized();
-    final horizontal = view.cross(upHint).normalized();
-    final vertical = horizontal.cross(view).normalized();
-    forward = view;
-    right = horizontal;
-    up = vertical;
+/// Maps 2D world positions on the court to pseudo 3D values (depth and scale)
+/// so movement and rendering can share the same perspective math.
+class CourtPerspectiveConverter {
+  CourtPerspectiveConverter(
+    this.layout, {
+    this.backScale = 1.0,
+    this.frontScale = 4.0,
+    this.backDepth = 0.0,
+    this.frontDepth = 1.0,
+  });
+
+  final CourtLayout layout;
+  final double backScale;
+  final double frontScale;
+  final double backDepth;
+  final double frontDepth;
+
+  /// Depth factor relative to the camera (0 = back line, 1 = front line).
+  double cameraDepth(double y) {
+    final span = layout.frontLineY - layout.backLineY;
+    if (span.abs() < 1e-3) {
+      return 0.0;
+    }
+    final t = (y - layout.backLineY) / span;
+    return t.clamp(0.0, 1.0);
   }
 
-  final Vec3 camera;
-  final double focalLength;
-  late final Vec3 forward;
-  late final Vec3 right;
-  late final Vec3 up;
+  /// Depth value mapped to [backDepth, frontDepth].
+  double depth(double y) => lerpDouble(backDepth, frontDepth, cameraDepth(y))!;
 
-  /// Projects a 3D world point to 2D screen coordinates.
-  Offset project(Vec3 point) {
-    final relative = point - camera;
-    final x = relative.dot(right);
-    final y = relative.dot(up);
-    final z = math.max(relative.dot(forward), 0.001);
-    final scale = focalLength / z;
-    return Offset(x * scale, y * scale);
+  /// Scale factor for rendering/movement, defaults to [backScale→frontScale].
+  double scaleAtY(double y, {double? minScale, double? maxScale}) {
+    final start = minScale ?? backScale;
+    final end = maxScale ?? frontScale;
+    return lerpDouble(start, end, cameraDepth(y))!;
   }
+
+  /// Converts a 2D offset to a Vec3 using the computed depth for its y value.
+  Vec3 toVec3(Offset point) => Vec3(point.dx, point.dy, depth(point.dy));
 }

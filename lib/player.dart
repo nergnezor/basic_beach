@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:basic_beach/draw_court.dart';
+import 'package:basic_beach/math_utils.dart';
 import 'package:flame_forge2d/flame_forge2d.dart';
 
 class Player extends BodyComponent {
@@ -54,6 +55,7 @@ class Player extends BodyComponent {
 
     final rect = game.camera.visibleWorldRect;
     final layout = computeCourtLayout(rect);
+    final perspective = CourtPerspectiveConverter(layout);
     final poly = isTopRow ? layout.topPolygon : layout.bottomPolygon;
 
     if (_walkDirection.length2 == 0) {
@@ -63,23 +65,16 @@ class Player extends BodyComponent {
 
     // scale movement by depth to match visual size
     final y = body.position.y;
-    final tDepth =
-        ((y - layout.backLineY) / (layout.frontLineY - layout.backLineY)).clamp(
-          0.0,
-          1.0,
-        );
-    final depthScale = lerpDouble(1, 4, tDepth)!;
+    final depthScale = perspective.scaleAtY(y);
     final moveSpeed = _walkSpeed * depthScale;
     body.linearVelocity = (_walkDirection.length2 > 0)
         ? _walkDirection.normalized() * moveSpeed
         : Vector2.zero();
 
     final head = body.position.clone();
-    final back = layout.backLineY;
-    final front = layout.frontLineY;
     final phase = autoWalk ? _time * 4.0 : 0.0;
 
-    final foot = _calculateFootPos(head, back, front, phase);
+    final foot = _calculateFootPos(head, perspective, phase);
     final footOff = Offset(foot.x, foot.y);
 
     if (!_pointInPoly(footOff, poly)) {
@@ -89,7 +84,7 @@ class Player extends BodyComponent {
       var guess = head.clone();
       const iters = 5;
       for (int i = 0; i < iters; i++) {
-        final cur = _calculateFootPos(guess, back, front, phase);
+        final cur = _calculateFootPos(guess, perspective, phase);
         guess.add(target - cur);
       }
       body.setTransform(guess, body.angle);
@@ -118,12 +113,8 @@ class Player extends BodyComponent {
   void renderCircle(Canvas canvas, Offset center, double radius) {
     final worldRect = game.camera.visibleWorldRect;
     final layout = computeCourtLayout(worldRect);
-    final back = layout.backLineY;
-    final front = layout.frontLineY;
-
-    final y = body.position.y;
-    final t = ((y - back) / (front - back)).clamp(0.0, 1.0);
-    final scale = lerpDouble(1, 4, t)!;
+    final perspective = CourtPerspectiveConverter(layout);
+    final scale = perspective.scaleAtY(body.position.y);
     final sr = radius * scale;
 
     final headPaint = Paint()..color = const Color(0xFF0000FF);
@@ -185,12 +176,10 @@ class Player extends BodyComponent {
 
   Vector2 _calculateFootPos(
     Vector2 headPos,
-    double back,
-    double front,
+    CourtPerspectiveConverter perspective,
     double phase,
   ) {
-    final t = ((headPos.y - back) / (front - back)).clamp(0.0, 1.0);
-    final scale = lerpDouble(1, 4, t)!;
+    final scale = perspective.scaleAtY(headPos.y);
     final sr = _radius * scale;
     final torsoBottomY = headPos.y + sr * 4;
     final hipL = Vector2(headPos.x - sr * 0.25, torsoBottomY);
